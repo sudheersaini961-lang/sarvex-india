@@ -1,0 +1,17 @@
+{
+  "short_name": "SARVEX",
+  "name": "SARVEX India - Multi-Vendor Marketplace",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231e3a8a'/><text x='50' y='65' font-size='50' font-weight='900' fill='%23ffffff' text-anchor='middle'>S</text><circle cx='80' cy='25' r='10' fill='%23f97316'/></svg>",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#1e3a8a",
+  "theme_color": "#1e3a8a",
+  "display": "standalone",
+  "orientation": "portrait"
+}

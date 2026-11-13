@@ -1,0 +1,6 @@
+{
+  "name": "SARVEX India - Multi-Vendor Marketplace",
+  "description": "Android-first multi-vendor ecommerce marketplace for India with real database integration, seller portal, COD checkout, and admin controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
