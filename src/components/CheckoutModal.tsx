@@ -80,13 +80,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
-    if (phone.replace(/\D/g, '').length < 10) {
-      setErrorMsg('Please enter a valid 10-digit Indian phone number.');
+    if (!/^[6-9][0-9]{9}$/.test(phone)) {
+      setErrorMsg('Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8 or 9.');
       return;
     }
 
-    if (pincode.trim().length !== 6) {
-      setErrorMsg('Please enter a valid 6-digit postal PIN code.');
+    if (!/^[1-9][0-9]{5}$/.test(pincode.trim())) {
+      setErrorMsg('Please enter a valid 6-digit Indian postal PIN code.');
+      return;
+    }
+
+    if (!state) {
+      setErrorMsg('Please select your delivery state.');
       return;
     }
 
@@ -244,10 +249,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   State *
                 </label>
                 <select
+                  required
                   value={state}
                   onChange={(e) => setState(e.target.value)}
                   className="w-full text-xs px-2.5 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-[#1e3a8a] focus:outline-none"
                 >
+                  <option value="" disabled>Select State</option>
                   {INDIAN_STATES.map((s) => (
                     <option key={s} value={s}>
                       {s}
