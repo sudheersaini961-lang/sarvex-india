@@ -156,37 +156,35 @@ export function useMarketplace() {
       if (!supabase) return;
 
       try {
-        // 1. Fetch Sellers / Seller Shops (from existing seller_shops table)
-        const { data: dbShops, error: shopsError } = await supabase.from('seller_shops').select('*');
-        if (shopsError) throw shopsError;
-        const shopNameMap: Record<string, string> = {};
+        // 1. Fetch only the approved public seller fields. Never expose private
+        // seller_shops columns (phone, pickup address, bank, IFSC, or UPI) publicly.
+        const { data: publicSellers, error: publicSellersError } = await supabase
+          .from('sellers')
+          .select('id, user_id, store_name, owner_name, city, state, pincode, status, rating, created_at');
+        if (publicSellersError) throw publicSellersError;
 
-        if (dbShops) {
-          globalState.sellers = dbShops.map((s: any) => {
-            const storeName = s.shop_name || s.store_name || 'Store';
-            shopNameMap[s.id] = storeName;
-            return {
-              id: s.id,
-              userId: s.owner_id || s.user_id || '',
-              storeName,
-              ownerName: s.owner_name || 'Verified Merchant',
-              phone: s.phone || '',
-              email: s.email || '',
-              city: s.city || 'India',
-              state: s.state || '',
-              pincode: s.pincode || '',
-              pickupAddress: s.pickup_address || '',
-              bankAccount: s.bank_account || '',
-              ifscCode: s.ifsc_code || '',
-              upiId: s.upi_id || '',
-              status: (s.approval_status || s.status || 'pending') as any,
-              commissionRate: Number(s.commission_rate || 0),
-              rating: Number(s.rating || 4.8),
-              createdAt: s.created_at || new Date().toISOString()
-            };
-          });
-          notify();
-        }
+        const shopNameMap: Record<string, string> = {};
+        globalState.sellers = (publicSellers || []).map((s: any): Seller => {
+          const storeName = s.store_name || '';
+          shopNameMap[s.id] = storeName;
+          return {
+            id: s.id,
+            userId: s.user_id || '',
+            storeName,
+            ownerName: s.owner_name || '',
+            phone: '',
+            email: '',
+            city: s.city || '',
+            state: s.state || '',
+            pincode: s.pincode || '',
+            pickupAddress: '',
+            status: s.status as any,
+            commissionRate: 0,
+            rating: Number(s.rating ?? 0),
+            createdAt: s.created_at || ''
+          };
+        });
+        notify();
 
         // 2. Fetch Products (from existing products table: id UUID, seller_shop_id, product_name, price_inr, etc.)
         const { data: dbProducts, error: productsError } = await supabase.from('products').select('*');
@@ -252,6 +250,45 @@ export function useMarketplace() {
             .maybeSingle();
 
           const assignedRole = (profile?.account_role || 'customer') as UserRole;
+
+          // Private seller records are fetched only for authenticated seller/admin
+          // sessions; database grants and RLS remain the authorization boundary.
+          if (assignedRole === 'seller' || assignedRole === 'admin') {
+            const { data: privateShops, error: privateShopsError } = await supabase
+              .from('seller_shops')
+              .select('*');
+            if (privateShopsError) {
+              console.warn('Private seller details could not be loaded:', privateShopsError);
+            } else if (privateShops) {
+              const privateSellers = privateShops.map((s: any): Seller => ({
+                id: s.id,
+                userId: s.owner_id || s.user_id || '',
+                storeName: s.shop_name || s.store_name || '',
+                ownerName: s.owner_name || '',
+                phone: s.phone || '',
+                email: s.email || '',
+                city: s.city || '',
+                state: s.state || '',
+                pincode: s.pincode || '',
+                pickupAddress: s.pickup_address || '',
+                bankAccount: s.bank_account || '',
+                ifscCode: s.ifsc_code || '',
+                upiId: s.upi_id || '',
+                status: (s.approval_status || s.status || 'pending') as any,
+                commissionRate: Number(s.commission_rate ?? 0),
+                rating: Number(s.rating ?? 0),
+                createdAt: s.created_at || ''
+              }));
+              const privateById = new Map(privateSellers.map((seller) => [seller.id, seller]));
+              globalState.sellers = [
+                ...globalState.sellers.filter((seller) => !privateById.has(seller.id)),
+                ...privateSellers
+              ];
+              for (const seller of privateSellers) shopNameMap[seller.id] = seller.storeName;
+              notify();
+            }
+          }
+
           globalState.currentUser = {
             id: authUser.id,
             email: authUser.email || '',
