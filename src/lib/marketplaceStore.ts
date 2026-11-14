@@ -164,6 +164,10 @@ export function useMarketplace() {
     let publicSellerSnapshot: Seller[] = [];
 
     async function syncSupabase() {
+      let syncGeneration = 0;
+
+    async function syncSupabase() {
+      const runId = ++syncGeneration;
       const supabase = getSupabase();
       if (!supabase) return;
 
@@ -174,6 +178,7 @@ export function useMarketplace() {
           .from('sellers')
           .select('id, user_id, store_name, owner_name, city, state, pincode, status, rating, created_at');
         if (publicSellersError) throw publicSellersError;
+        if (runId !== syncGeneration) return;
 
         const shopNameMap: Record<string, string> = {};
         globalState.sellers = (publicSellers || []).map((s: any): Seller => {
@@ -202,6 +207,7 @@ export function useMarketplace() {
         // 2. Fetch Products (from existing products table: id UUID, seller_shop_id, product_name, price_inr, etc.)
         const { data: dbProducts, error: productsError } = await supabase.from('products').select('*');
         if (productsError) throw productsError;
+        if (runId !== syncGeneration) return;
         if (dbProducts) {
           // Never turn malformed or incomplete database rows into believable-looking
           // listings. Required fields come from the database; invalid rows are omitted.
@@ -269,6 +275,7 @@ export function useMarketplace() {
         // 3. Fetch Reviews
         const { data: dbReviews, error: reviewsError } = await supabase.from('reviews').select('*');
         if (reviewsError) throw reviewsError;
+        if (runId !== syncGeneration) return;
         if (dbReviews) {
           globalState.reviews = dbReviews.map((r: any) => ({
             id: r.id,
@@ -287,6 +294,7 @@ export function useMarketplace() {
 
         // 4. Check Current Supabase Auth Session
         const { data: sessionData } = await supabase.auth.getSession();
+        if (runId !== syncGeneration) return;
         if (sessionData?.session?.user) {
           const authUser = sessionData.session.user;
           // Fetch from customer_profiles
@@ -297,6 +305,17 @@ export function useMarketplace() {
             .maybeSingle();
 
           if (profileError) throw new Error(`Account profile could not be verified: ${profileError.message}`);
+          if (runId !== syncGeneration) return;
+          if (profileError) {
+            globalState.currentUser = null;
+            globalState.activeRole = 'customer';
+            globalState.cart = [];
+            globalState.wishlistIds = [];
+            globalState.orders = [];
+            globalState.sellers = [...publicSellerSnapshot];
+            notify();
+            throw new Error(`Account profile could not be verified: ${profileError.message}`);
+          }
           if (!profile) {
             globalState.currentUser = null;
             globalState.activeRole = 'customer';
@@ -316,6 +335,8 @@ export function useMarketplace() {
             const { data: privateShops, error: privateShopsError } = await supabase
               .from('seller_shops')
               .select('*');
+            if (privateShopsError) {
+            if (runId !== syncGeneration) return;
             if (privateShopsError) {
               console.warn('Private seller details could not be loaded:', privateShopsError);
             } else if (privateShops) {
@@ -364,6 +385,8 @@ export function useMarketplace() {
             .select('product_id, quantity')
             .eq('owner_id', authUser.id);
           if (cartError) throw cartError;
+          if (runId !== syncGeneration) return;
+          if (cartError) throw cartError;
 
           const syncedCart: CartItem[] = [];
           for (const item of dbCart || []) {
@@ -382,6 +405,8 @@ export function useMarketplace() {
             .select('product_id')
             .eq('owner_id', authUser.id);
           if (wishlistError) throw wishlistError;
+          if (runId !== syncGeneration) return;
+          if (wishlistError) throw wishlistError;
           globalState.wishlistIds = (dbWishlist || [])
             .map((item: { product_id: string }) => item.product_id)
             .filter((productId: string) => globalState.products.some((product) => product.id === productId));
@@ -394,6 +419,8 @@ export function useMarketplace() {
             const { data: sellerRows, error: sellerRowsError } = await supabase
               .from('seller_order_items_view')
               .select('*');
+            if (sellerRowsError) throw sellerRowsError;
+            if (runId !== syncGeneration) return;
             if (sellerRowsError) throw sellerRowsError;
             const grouped = new Map<string, any[]>();
             for (const row of sellerRows || []) {
@@ -432,6 +459,8 @@ export function useMarketplace() {
           } else {
             const { data: dbOrders, error: ordersError } = await supabase.from('orders').select('*');
             if (ordersError) throw ordersError;
+            if (runId !== syncGeneration) return;
+            if (ordersError) throw ordersError;
             const orderIds = (dbOrders || []).map((order: any) => order.id);
             let dbOrderItems: any[] = [];
             if (orderIds.length > 0) {
@@ -439,6 +468,8 @@ export function useMarketplace() {
                 .from('order_items')
                 .select('*')
                 .in('order_id', orderIds);
+              if (itemsError) throw itemsError;
+              if (runId !== syncGeneration) return;
               if (itemsError) throw itemsError;
               dbOrderItems = items || [];
             }
@@ -485,6 +516,15 @@ export function useMarketplace() {
     if (supabase) {
       const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
+          // Invalidate any in-flight sync for the previous account immediately.
+          syncGeneration += 1;
+          globalState.currentUser = null;
+          globalState.activeRole = 'customer';
+          globalState.cart = [];
+          globalState.wishlistIds = [];
+          globalState.orders = [];
+          globalState.sellers = [...publicSellerSnapshot];
+          notify();
           const userId = session.user.id;
           Promise.resolve().then(async () => {
             // Ignore a queued sign-in sync if the active session has since changed.
@@ -495,6 +535,7 @@ export function useMarketplace() {
             console.error('Post-sign-in data sync failed:', error);
           });
         } else if (event === 'SIGNED_OUT') {
+          syncGeneration += 1;
           globalState.currentUser = null;
           globalState.activeRole = 'customer';
           globalState.sellers = [...publicSellerSnapshot];
