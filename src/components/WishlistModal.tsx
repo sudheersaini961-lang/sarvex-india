@@ -16,6 +16,12 @@ export const WishlistModal: React.FC<WishlistModalProps> = ({
 }) => {
   const { wishlistIds, products, toggleWishlist, addToCart } = useMarketplace();
 
+  const runWishlistAction = (action: () => Promise<void>) => {
+    void action().catch((error) => {
+      window.alert(error instanceof Error ? error.message : 'Your wishlist could not be updated.');
+    });
+  };
+
   if (!isOpen) return null;
 
   const wishlistedProducts = products.filter((p) => wishlistIds.includes(p.id));
@@ -98,7 +104,7 @@ export const WishlistModal: React.FC<WishlistModalProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        addToCart(product, 1);
+                        runWishlistAction(() => addToCart(product, 1));
                       }}
                       className="text-xs font-bold text-[#1e3a8a] bg-blue-50 hover:bg-blue-100 px-3 py-1 rounded-lg flex items-center gap-1"
                     >
@@ -107,7 +113,7 @@ export const WishlistModal: React.FC<WishlistModalProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        toggleWishlist(product.id);
+                        runWishlistAction(() => toggleWishlist(product.id));
                       }}
                       className="text-gray-400 hover:text-red-600 p-1"
                       title="Remove from wishlist"
