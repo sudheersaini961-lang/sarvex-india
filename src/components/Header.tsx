@@ -39,9 +39,13 @@ export const Header: React.FC<HeaderProps> = ({
     logoutUser,
   } = useMarketplace();
 
-  const [deliveryPincode, setDeliveryPincode] = useState('');
+  const [deliveryPincode, setDeliveryPincode] = useState(() => {
+    try { return localStorage.getItem('sarvex_delivery_pincode') || ''; }
+    catch { return ''; }
+  });
   const [isChangingPin, setIsChangingPin] = useState(false);
   const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
   const [showRoleMenu, setShowRoleMenu] = useState(false);
 
   const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -61,16 +65,21 @@ export const Header: React.FC<HeaderProps> = ({
 
   const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pinInput.trim().length === 6) {
-      setDeliveryPincode(pinInput.trim());
-      setIsChangingPin(false);
+    const normalizedPin = pinInput.trim();
+    if (!/^[1-9][0-9]{5}$/.test(normalizedPin)) {
+      setPinError('Enter a valid 6-digit Indian PIN code.');
+      return;
     }
+    setDeliveryPincode(normalizedPin);
+    setPinError('');
+    try { localStorage.setItem('sarvex_delivery_pincode', normalizedPin); } catch { /* storage may be unavailable */ }
+    setIsChangingPin(false);
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-[#1e3a8a] text-white shadow-md">
+    <header className="sticky top-0 z-40 pt-[env(safe-area-inset-top,0px)] bg-[#1e3a8a] text-white shadow-md">
       {/* Top Android Sub-bar: Delivery Location & Role Switcher */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[#172554] text-xs border-b border-blue-900/50">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 px-3 py-2 bg-[#172554] text-xs border-b border-blue-900/50">
         <button
           onClick={() => setIsChangingPin(true)}
           className="flex items-center gap-1 text-blue-200 hover:text-white transition-colors"
@@ -274,7 +283,7 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             </div>
             <p className="text-xs text-gray-600 mb-3">
-              Enter your 6-digit Indian Postal PIN code to view Cash on Delivery availability and fastest courier dispatch.
+              Enter your 6-digit Indian PIN code to save your preferred delivery area. Actual delivery and Cash on Delivery availability can only be confirmed when seller and courier serviceability is connected.
             </p>
             <form onSubmit={handlePinSubmit} className="space-y-3">
               <input
@@ -283,10 +292,13 @@ export const Header: React.FC<HeaderProps> = ({
                 maxLength={6}
                 value={pinInput}
                 onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
+                inputMode="numeric"
+                autoComplete="postal-code"
                 placeholder="e.g. 110016 or 560034"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-center text-lg font-mono font-bold tracking-widest text-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a] focus:outline-none"
                 autoFocus
               />
+              {pinError && <p role="alert" className="text-[11px] font-semibold text-red-600">{pinError}</p>}
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -297,7 +309,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={pinInput.trim().length !== 6}
+                  disabled={!/^[1-9][0-9]{5}$/.test(pinInput.trim())}
                   className="flex-1 py-2 text-xs font-bold text-white bg-[#1e3a8a] rounded-lg hover:bg-blue-800 disabled:opacity-50"
                 >
                   Apply Pincode
