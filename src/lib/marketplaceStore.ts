@@ -313,21 +313,32 @@ export function useMarketplace() {
           globalState.activeRole = assignedRole;
 
           // Fetch Cart from cart_items table
-          const { data: dbCart } = await supabase
+          const { data: dbCart, error: cartError } = await supabase
             .from('cart_items')
             .select('product_id, quantity')
             .eq('owner_id', authUser.id);
+          if (cartError) throw cartError;
 
-          if (dbCart && dbCart.length > 0) {
-            const syncedCart: CartItem[] = [];
-            for (const item of dbCart) {
-              const prod = globalState.products.find((p) => p.id === item.product_id);
-              if (prod) syncedCart.push({ product: prod, quantity: item.quantity });
+          const syncedCart: CartItem[] = [];
+          for (const item of dbCart || []) {
+            const prod = globalState.products.find((p) => p.id === item.product_id);
+            const quantity = Number(item.quantity);
+            if (prod && Number.isSafeInteger(quantity) && quantity > 0 && quantity <= prod.stock) {
+              syncedCart.push({ product: prod, quantity });
             }
-            globalState.cart = syncedCart;
-          } else {
-            globalState.cart = [];
           }
+          globalState.cart = syncedCart;
+
+          // Wishlist is private account data; reload it for every authenticated session
+          // so one account's saved items are never shown to another account.
+          const { data: dbWishlist, error: wishlistError } = await supabase
+            .from('wishlist_items')
+            .select('product_id')
+            .eq('owner_id', authUser.id);
+          if (wishlistError) throw wishlistError;
+          globalState.wishlistIds = (dbWishlist || [])
+            .map((item: { product_id: string }) => item.product_id)
+            .filter((productId: string) => globalState.products.some((product) => product.id === productId));
 
           // Load orders through customer/admin RLS, or the dedicated seller-safe view.
           const approvedOwnedShop = globalState.sellers.some((seller) =>
@@ -854,19 +865,29 @@ export function useMarketplace() {
     const itemIds = order.items.map((item) => item.id).filter(isUuid);
     if (itemIds.length === 0) throw new Error('No database order-item records are available for fulfillment.');
 
-    // Seller RLS permits status updates only on order_items belonging to their own shop.
+    // Preflight the exact writable set before mutating anything. Seller RLS may
+    // expose only that seller's items in a multi-seller order.
+    const { data: visibleItems, error: visibilityError } = await supabase
+      .from('order_items')
+      .select('id')
+      .in('id', itemIds);
+    if (visibilityError) throw new Error(`Order items could not be verified: ${visibilityError.message}`);
+    const visibleIds = new Set((visibleItems || []).map((row: { id: string }) => row.id));
+    if (visibleIds.size !== itemIds.length || itemIds.some((id) => !visibleIds.has(id))) {
+      throw new Error('The full set of order items is not visible for this account. No status changes were attempted; refresh order details.');
+    }
+
     const { data, error } = await supabase
       .from('order_items')
       .update({ item_status: nextStatus })
       .in('id', itemIds)
       .select('id');
     if (error) throw new Error(`Order item status was not saved: ${error.message}`);
-    if (!data || data.length === 0) throw new Error('No order items were updated. Check seller ownership and permissions.');
-    const updatedIds = new Set(data.map((row: { id: string }) => row.id));
+    const updatedIds = new Set((data || []).map((row: { id: string }) => row.id));
     if (updatedIds.size !== itemIds.length || itemIds.some((id) => !updatedIds.has(id))) {
-      // A seller may only be allowed to update a subset of a multi-seller order.
-      // Never report the whole order as advanced when only some items changed.
-      throw new Error('Only part of this multi-seller order was updated. The overall order status was left unchanged; refresh order details.');
+      // The visibility check can race with a policy/data change. Do not claim
+      // aggregate success; a transactional server-side RPC is needed for atomicity.
+      throw new Error('The database changed which order items were writable during the update. Refresh order details and verify item statuses.');
     }
 
     order.status = nextStatus;
