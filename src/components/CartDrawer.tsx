@@ -61,13 +61,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           </button>
         </div>
 
-        {/* Free Delivery alert banner */}
-        <div className="bg-emerald-50 px-4 py-2 border-b border-emerald-100 flex items-center justify-between text-xs text-emerald-800 font-medium">
-          <span className="flex items-center gap-1.5">
-            <Truck size={14} className="text-emerald-600" />
-            <span>Eligible for <strong>FREE Cash On Delivery</strong></span>
-          </span>
-          <span className="text-emerald-700 font-bold">₹0 Shipping</span>
+        <div className="bg-amber-50 px-4 py-2 border-b border-amber-100 text-xs text-amber-900 font-medium">
+          COD is the current checkout method. Delivery availability and shipping charges are not verified in the app yet.
         </div>
 
         {/* Cart items list or empty state */}
@@ -184,14 +179,14 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 )}
                 <div className="flex justify-between text-gray-600">
                   <span>Delivery Charges</span>
-                  <span className="text-emerald-700 font-semibold">FREE</span>
+                  <span className="text-amber-700 font-semibold">To be confirmed</span>
                 </div>
                 <div className="flex justify-between text-gray-600">
                   <span>Platform Fee</span>
-                  <span className="text-emerald-700 font-semibold">FREE ₹0</span>
+                  <span className="text-amber-700 font-semibold">Not configured</span>
                 </div>
                 <div className="flex justify-between font-extrabold text-gray-900 pt-2 border-t border-gray-200 text-sm">
-                  <span>Total Amount</span>
+                  <span>Product Subtotal</span>
                   <span className="text-[#1e3a8a]">₹{cartTotalAmount.toLocaleString('en-IN')}</span>
                 </div>
                 {cartTotalSavings > 0 && (
@@ -205,7 +200,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               <div className="flex items-center gap-2 p-2.5 bg-blue-50/70 rounded-xl border border-blue-100 text-xs text-[#1e3a8a]">
                 <ShieldCheck size={18} className="shrink-0 text-[#f97316]" />
                 <span className="text-[11px]">
-                  Pay cash at delivery. No prepayment required. Open parcel verification enabled.
+                  COD is the current checkout payment method. Delivery and parcel-opening services are not integrated yet.
                 </span>
               </div>
             </>
@@ -217,7 +212,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
           <div className="p-3 bg-white border-t border-gray-200">
             <div className="flex items-center justify-between mb-2 px-1">
               <div>
-                <span className="text-[10px] text-gray-500 uppercase font-bold">Total Payable</span>
+                <span className="text-[10px] text-gray-500 uppercase font-bold">Product Subtotal</span>
                 <p className="text-lg font-black text-[#1e3a8a]">
                   ₹{cartTotalAmount.toLocaleString('en-IN')}
                 </p>
