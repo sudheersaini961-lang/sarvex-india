@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - fix/public-seller-sync-security
 
 jobs:
   build-android-debug-apk:
@@ -26,8 +27,8 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Install npm dependencies
-        run: npm install
+      - name: Install locked npm dependencies
+        run: npm ci
 
       - name: Run TypeScript lint check
         run: npm run lint
