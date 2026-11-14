@@ -151,6 +151,8 @@ export function useMarketplace() {
 
   // Sync with Supabase on mount and listen to Auth state changes
   useEffect(() => {
+    let publicSellerSnapshot: Seller[] = [];
+
     async function syncSupabase() {
       const supabase = getSupabase();
       if (!supabase) return;
@@ -184,6 +186,7 @@ export function useMarketplace() {
             createdAt: s.created_at || ''
           };
         });
+        publicSellerSnapshot = [...globalState.sellers];
         notify();
 
         // 2. Fetch Products (from existing products table: id UUID, seller_shop_id, product_name, price_inr, etc.)
@@ -422,6 +425,41 @@ export function useMarketplace() {
             .maybeSingle();
 
           const assignedRole = (profile?.account_role || 'customer') as UserRole;
+          if (assignedRole === 'seller' || assignedRole === 'admin') {
+            const { data: privateShops, error: privateShopsError } = await supabase
+              .from('seller_shops')
+              .select('*');
+            if (privateShopsError) {
+              console.warn('Private seller details could not be loaded after sign-in:', privateShopsError);
+            } else if (privateShops) {
+              const privateSellers = privateShops.map((s: any): Seller => ({
+                id: s.id,
+                userId: s.owner_id || s.user_id || '',
+                storeName: s.shop_name || s.store_name || '',
+                ownerName: s.owner_name || '',
+                phone: s.phone || '',
+                email: s.email || '',
+                city: s.city || '',
+                state: s.state || '',
+                pincode: s.pincode || '',
+                pickupAddress: s.pickup_address || '',
+                bankAccount: s.bank_account || '',
+                ifscCode: s.ifsc_code || '',
+                upiId: s.upi_id || '',
+                status: (s.approval_status || s.status || 'pending') as any,
+                commissionRate: Number(s.commission_rate ?? 0),
+                rating: Number(s.rating ?? 0),
+                createdAt: s.created_at || ''
+              }));
+              const privateById = new Map(privateSellers.map((seller) => [seller.id, seller]));
+              globalState.sellers = [
+                ...publicSellerSnapshot.filter((seller) => !privateById.has(seller.id)),
+                ...privateSellers
+              ];
+            }
+          } else {
+            globalState.sellers = [...publicSellerSnapshot];
+          }
           globalState.currentUser = {
             id: authUser.id,
             email: authUser.email || '',
@@ -435,6 +473,7 @@ export function useMarketplace() {
         } else if (event === 'SIGNED_OUT') {
           globalState.currentUser = null;
           globalState.activeRole = 'customer';
+          globalState.sellers = [...publicSellerSnapshot];
           globalState.cart = [];
           notify();
         }
