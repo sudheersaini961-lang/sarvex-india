@@ -32,6 +32,12 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
     cartTotalSavings,
   } = useMarketplace();
 
+  const runCartAction = (action: () => Promise<void>) => {
+    void action().catch((error) => {
+      window.alert(error instanceof Error ? error.message : 'Your cart could not be updated.');
+    });
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -89,7 +95,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   Items in your bag
                 </span>
                 <button
-                  onClick={clearCart}
+                  onClick={() => runCartAction(clearCart)}
                   className="text-xs text-red-600 hover:underline flex items-center gap-1"
                 >
                   <Trash2 size={12} /> Clear all
@@ -130,7 +136,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
                       <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden bg-gray-50">
                         <button
-                          onClick={() => updateCartQuantity(product.id, quantity - 1)}
+                          onClick={() => runCartAction(() => updateCartQuantity(product.id, quantity - 1))}
                           className="px-2 py-1 text-gray-600 hover:bg-gray-200 transition"
                           aria-label="Decrease quantity"
                         >
@@ -140,7 +146,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                           {quantity}
                         </span>
                         <button
-                          onClick={() => updateCartQuantity(product.id, quantity + 1)}
+                          onClick={() => runCartAction(() => updateCartQuantity(product.id, quantity + 1))}
                           disabled={quantity >= product.stock}
                           className="px-2 py-1 text-gray-600 hover:bg-gray-200 transition disabled:opacity-40"
                           aria-label="Increase quantity"
@@ -150,7 +156,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                       </div>
 
                       <button
-                        onClick={() => removeFromCart(product.id)}
+                        onClick={() => runCartAction(() => removeFromCart(product.id))}
                         className="text-gray-400 hover:text-red-600 p-1 transition"
                         title="Remove"
                       >
