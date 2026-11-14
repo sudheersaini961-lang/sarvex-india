@@ -1076,16 +1076,18 @@ export function useMarketplace() {
       throw new Error('A connected database and valid product record are required to delete a listing.');
     }
     const currentUser = globalState.currentUser;
+    if (!currentUser) throw new Error('Please sign in before deleting a product.');
+    const isAdmin = currentUser.role === 'admin';
     const ownedApprovedShop = globalState.sellers.find((seller) =>
-      seller.userId === currentUser?.id && seller.status === 'approved'
+      seller.userId === currentUser.id && seller.status === 'approved'
     );
-    if (currentUser?.role !== 'admin' && (!ownedApprovedShop || !globalState.products.some((product) =>
+    if (!isAdmin && (!ownedApprovedShop || !globalState.products.some((product) =>
       product.id === productId && product.sellerId === ownedApprovedShop.id
     ))) {
       throw new Error('Only an administrator or the owner of this approved shop can delete this product.');
     }
     let deleteQuery = supabase.from('products').delete().eq('id', productId);
-    if (currentUser.role !== 'admin' && ownedApprovedShop) {
+    if (!isAdmin && ownedApprovedShop) {
       deleteQuery = deleteQuery.eq('seller_shop_id', ownedApprovedShop.id);
     }
     const { data, error } = await deleteQuery.select('id');
