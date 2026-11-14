@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.view.Window;
 
 import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.getcapacitor.BridgeActivity;
 
@@ -20,6 +21,9 @@ public class MainActivity extends BridgeActivity {
 
         Window window = getWindow();
         window.setStatusBarColor(Color.rgb(23, 37, 84));
+        WindowInsetsControllerCompat insetsController =
+                new WindowInsetsControllerCompat(window, window.getDecorView());
+        insetsController.setAppearanceLightStatusBars(false);
         window.setNavigationBarColor(Color.rgb(255, 255, 255));
     }
 }
