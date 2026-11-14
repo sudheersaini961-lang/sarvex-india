@@ -96,7 +96,7 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
             Customer Ratings & Reviews
           </h3>
           <p className="text-[11px] text-gray-500">
-            {totalReviewsCount} Verified buyer ratings from Indian customers
+            {totalReviewsCount} customer ratings. Verified-purchase status is checked by the database.
           </p>
         </div>
 
@@ -124,10 +124,10 @@ export const ProductReviews: React.FC<ProductReviewsProps> = ({ productId }) => 
         >
           <div className="flex items-center justify-between border-b border-amber-200/50 pb-2">
             <h4 className="text-xs font-bold text-[#1e3a8a] flex items-center gap-1.5">
-              <Star size={14} className="fill-amber-500 text-amber-500" /> Write a Verified Product Review
+              <Star size={14} className="fill-amber-500 text-amber-500" /> Write a Product Review
             </h4>
             <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-              <ShieldCheck size={11} /> Verified Buyer
+              <ShieldCheck size={11} /> Purchase status checked after submission
             </span>
           </div>
 
