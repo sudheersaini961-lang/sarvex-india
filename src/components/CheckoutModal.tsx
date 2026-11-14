@@ -281,7 +281,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           </div>
 
-          {/* Payment Method Selector (100% Free COD) */}
+          {/* Payment Method Selector (COD only) */}
           <div className="border border-emerald-200 bg-emerald-50/60 rounded-xl p-3.5 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
@@ -293,7 +293,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </span>
             </div>
             <p className="text-[11px] text-emerald-800 leading-normal">
-              Zero advance payment. Pay ₹{cartTotalAmount.toLocaleString('en-IN')} in cash or scan delivery agent’s UPI QR code when package is delivered to your hands.
+              Zero advance payment. Pay ₹{cartTotalAmount.toLocaleString('en-IN')} in cash when the order is delivered. UPI-at-delivery is not integrated yet.
             </p>
           </div>
 
