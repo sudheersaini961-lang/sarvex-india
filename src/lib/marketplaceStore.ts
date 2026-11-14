@@ -746,12 +746,16 @@ export function useMarketplace() {
     if (!Number.isFinite(quantity)) throw new Error('Choose a valid cart quantity.');
     const item = globalState.cart.find((i) => i.product.id === productId);
     const requestedQuantity = Math.floor(quantity);
+    if (requestedQuantity > 0 && !item) {
+      throw new Error('This product is not present in your cart. Refresh your cart and try again.');
+    }
     const effectiveQuantity = requestedQuantity <= 0
       ? 0
       : Math.min(Math.max(0, Math.floor(item?.product.stock ?? 0)), requestedQuantity);
 
     const accountId = globalState.currentUser?.id;
-    const previousCart = [...globalState.cart];
+    // Clone cart rows so an optimistic quantity mutation cannot corrupt rollback state.
+    const previousCart = globalState.cart.map((cartItem) => ({ ...cartItem, product: { ...cartItem.product } }));
     if (effectiveQuantity === 0) {
       globalState.cart = globalState.cart.filter((cartItem) => cartItem.product.id !== productId);
     } else if (item) {
