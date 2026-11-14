@@ -27,7 +27,7 @@ const ORDER_STEPS: { status: OrderStatus; label: string; desc: string }[] = [
   },
   {
     status: 'confirmed',
-    label: 'Verified by Seller',
+    label: 'Confirmed by Seller',
     desc: 'The seller marked the order as confirmed.'
   },
   {
