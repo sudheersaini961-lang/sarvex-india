@@ -851,6 +851,12 @@ export function useMarketplace() {
     if (requiredCheckoutFields.some((value) => typeof value !== 'string' || !value.trim())) {
       throw new Error('Please complete your name, phone number and full delivery address.');
     }
+    if (!/^[6-9][0-9]{9}$/.test(orderData.customerPhone.replace(/\\D/g, ''))) {
+      throw new Error('Enter a valid 10-digit Indian mobile number.');
+    }
+    if (!/^[1-9][0-9]{5}$/.test(orderData.pincode.trim())) {
+      throw new Error('Enter a valid 6-digit Indian PIN code.');
+    }
     if (globalState.cart.some((item) =>
       !isUuid(item.product.id) ||
       !Number.isSafeInteger(item.quantity) ||
