@@ -302,7 +302,6 @@ export function useMarketplace() {
             .eq('owner_id', authUser.id)
             .maybeSingle();
 
-          if (profileError) throw new Error(`Account profile could not be verified: ${profileError.message}`);
           if (runId !== syncGeneration) return;
           if (profileError) {
             globalState.currentUser = null;
@@ -333,7 +332,6 @@ export function useMarketplace() {
             const { data: privateShops, error: privateShopsError } = await supabase
               .from('seller_shops')
               .select('*');
-            if (privateShopsError) {
             if (runId !== syncGeneration) return;
             if (privateShopsError) {
               console.warn('Private seller details could not be loaded:', privateShopsError);
@@ -382,7 +380,6 @@ export function useMarketplace() {
             .from('cart_items')
             .select('product_id, quantity')
             .eq('owner_id', authUser.id);
-          if (cartError) throw cartError;
           if (runId !== syncGeneration) return;
           if (cartError) throw cartError;
 
@@ -402,7 +399,6 @@ export function useMarketplace() {
             .from('wishlist_items')
             .select('product_id')
             .eq('owner_id', authUser.id);
-          if (wishlistError) throw wishlistError;
           if (runId !== syncGeneration) return;
           if (wishlistError) throw wishlistError;
           globalState.wishlistIds = (dbWishlist || [])
@@ -417,7 +413,6 @@ export function useMarketplace() {
             const { data: sellerRows, error: sellerRowsError } = await supabase
               .from('seller_order_items_view')
               .select('*');
-            if (sellerRowsError) throw sellerRowsError;
             if (runId !== syncGeneration) return;
             if (sellerRowsError) throw sellerRowsError;
             const grouped = new Map<string, any[]>();
@@ -456,7 +451,6 @@ export function useMarketplace() {
             }));
           } else {
             const { data: dbOrders, error: ordersError } = await supabase.from('orders').select('*');
-            if (ordersError) throw ordersError;
             if (runId !== syncGeneration) return;
             if (ordersError) throw ordersError;
             const orderIds = (dbOrders || []).map((order: any) => order.id);
@@ -466,7 +460,6 @@ export function useMarketplace() {
                 .from('order_items')
                 .select('*')
                 .in('order_id', orderIds);
-              if (itemsError) throw itemsError;
               if (runId !== syncGeneration) return;
               if (itemsError) throw itemsError;
               dbOrderItems = items || [];
