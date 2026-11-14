@@ -326,9 +326,10 @@ export function useMarketplace() {
 
           const assignedRole = profile.account_role as UserRole;
 
-          // Private seller records are fetched only for authenticated seller/admin
-          // sessions; database grants and RLS remain the authorization boundary.
-          if (assignedRole === 'seller' || assignedRole === 'admin') {
+          // Fetch the current user's private seller application for every signed-in
+          // account. RLS limits ordinary customers to their own rows and admins to
+          // authorized rows, so pending applications remain visible after reload.
+          {
             const { data: privateShops, error: privateShopsError } = await supabase
               .from('seller_shops')
               .select('*');
