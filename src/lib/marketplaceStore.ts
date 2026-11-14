@@ -162,9 +162,7 @@ export function useMarketplace() {
   // Sync with Supabase on mount and listen to Auth state changes
   useEffect(() => {
     let publicSellerSnapshot: Seller[] = [];
-
-    async function syncSupabase() {
-      let syncGeneration = 0;
+    let syncGeneration = 0;
 
     async function syncSupabase() {
       const runId = ++syncGeneration;
