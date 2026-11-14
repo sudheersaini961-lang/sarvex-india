@@ -168,11 +168,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-gray-900">Cash on Delivery (COD)</h4>
                   <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
-                    Available
+                    COD only
                   </span>
                 </div>
                 <p className="text-xs text-gray-600 mt-0.5">
-                  Pay with Cash or UPI directly to delivery agent at your doorstep.
+                  Cash on delivery is the currently configured payment method. Delivery serviceability is not verified by this app yet.
                 </p>
               </div>
             </div>
@@ -182,9 +182,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <RotateCcw size={18} />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-gray-900">7 Days Easy Return & Refund</h4>
+                <h4 className="text-xs font-bold text-gray-900">Returns & Refunds</h4>
                 <p className="text-xs text-gray-600 mt-0.5">
-                  Full refund or doorstep replacement if damaged or wrong item delivered.
+                  A return and refund policy has not been configured in the app yet. Please confirm the policy before ordering.
                 </p>
               </div>
             </div>
@@ -216,7 +216,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
               {pinChecked && (
                 <p className="text-[11px] text-emerald-700 font-medium mt-1.5 flex items-center gap-1">
-                  <CheckCircle2 size={12} /> Standard Free Delivery within 2-4 Business Days to PIN {testPin}.
+                  <CheckCircle2 size={12} /> PIN format is valid. Delivery serviceability and estimated delivery time are not connected yet.
                 </p>
               )}
             </form>
