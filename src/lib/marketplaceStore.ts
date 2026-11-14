@@ -74,7 +74,17 @@ export const INITIAL_ORDERS: Order[] = [];
 
 function getCheckoutIdempotencyKey(payload: Record<string, unknown>): string {
   const storageKey = 'sarvex_pending_checkout_v1';
-  const fingerprint = JSON.stringify(payload);
+  // Persist only a non-reversible fingerprint. Never write customer name, phone,
+  // email, or delivery address to browser storage.
+  const source = JSON.stringify(payload);
+  let hashA = 0x811c9dc5;
+  let hashB = 0x9e3779b9;
+  for (let i = 0; i < source.length; i += 1) {
+    const code = source.charCodeAt(i);
+    hashA = Math.imul(hashA ^ code, 0x01000193);
+    hashB = Math.imul(hashB ^ (code + i), 0x85ebca6b);
+  }
+  const fingerprint = `${(hashA >>> 0).toString(16)}${(hashB >>> 0).toString(16)}`;
   if (typeof window !== 'undefined') {
     try {
       const existing = localStorage.getItem(storageKey);
@@ -475,6 +485,9 @@ export function useMarketplace() {
           globalState.activeRole = 'customer';
           globalState.sellers = [...publicSellerSnapshot];
           globalState.cart = [];
+          globalState.wishlistIds = [];
+          globalState.orders = [];
+          clearCheckoutIdempotencyKey();
           notify();
         }
       });
@@ -513,7 +526,7 @@ export function useMarketplace() {
           // 1. Real Supabase Auth Signup
           const { data: authData, error: authErr } = await supabase.auth.signUp({
             email: email.trim(),
-            password: password.trim(),
+            password,
             options: {
               data: {
                 display_name: fullName.trim() || email.split('@')[0],
@@ -562,7 +575,7 @@ export function useMarketplace() {
           // 2. Real Supabase Auth Sign In
           const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
             email: email.trim(),
-            password: password.trim()
+            password
           });
 
           if (authErr) {
@@ -616,6 +629,10 @@ export function useMarketplace() {
     globalState.currentUser = null;
     globalState.activeRole = 'customer';
     globalState.cart = [];
+    globalState.wishlistIds = [];
+    globalState.orders = [];
+    globalState.sellers = globalState.sellers.filter((seller) => !seller.phone && !seller.email && !seller.pickupAddress && !seller.bankAccount && !seller.ifscCode && !seller.upiId);
+    clearCheckoutIdempotencyKey();
     notify();
   };
 
