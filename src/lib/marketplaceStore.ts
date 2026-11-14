@@ -422,64 +422,21 @@ export function useMarketplace() {
 
     syncSupabase();
 
-    // Listen to Supabase Auth State Changes
+    // Auth callbacks must stay synchronous: Supabase holds an auth lock while
+    // notifying listeners. Defer database reads until after that callback returns.
     const supabase = getSupabase();
     if (supabase) {
-      const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
-          const authUser = session.user;
-          const { data: profile } = await supabase
-            .from('customer_profiles')
-            .select('*')
-            .eq('owner_id', authUser.id)
-            .maybeSingle();
-
-          const assignedRole = (profile?.account_role || 'customer') as UserRole;
-          if (assignedRole === 'seller' || assignedRole === 'admin') {
-            const { data: privateShops, error: privateShopsError } = await supabase
-              .from('seller_shops')
-              .select('*');
-            if (privateShopsError) {
-              console.warn('Private seller details could not be loaded after sign-in:', privateShopsError);
-            } else if (privateShops) {
-              const privateSellers = privateShops.map((s: any): Seller => ({
-                id: s.id,
-                userId: s.owner_id || s.user_id || '',
-                storeName: s.shop_name || s.store_name || '',
-                ownerName: s.owner_name || '',
-                phone: s.phone || '',
-                email: s.email || '',
-                city: s.city || '',
-                state: s.state || '',
-                pincode: s.pincode || '',
-                pickupAddress: s.pickup_address || '',
-                bankAccount: s.bank_account || '',
-                ifscCode: s.ifsc_code || '',
-                upiId: s.upi_id || '',
-                status: (s.approval_status || s.status || 'pending') as any,
-                commissionRate: Number(s.commission_rate ?? 0),
-                rating: Number(s.rating ?? 0),
-                createdAt: s.created_at || ''
-              }));
-              const privateById = new Map(privateSellers.map((seller) => [seller.id, seller]));
-              globalState.sellers = [
-                ...publicSellerSnapshot.filter((seller) => !privateById.has(seller.id)),
-                ...privateSellers
-              ];
-            }
-          } else {
-            globalState.sellers = [...publicSellerSnapshot];
-          }
-          globalState.currentUser = {
-            id: authUser.id,
-            email: authUser.email || '',
-            fullName: profile?.display_name || authUser.email?.split('@')[0] || 'User',
-            phone: profile?.phone || '',
-            role: assignedRole,
-            createdAt: authUser.created_at
-          };
-          globalState.activeRole = assignedRole;
-          notify();
+          const userId = session.user.id;
+          Promise.resolve().then(async () => {
+            // Ignore a queued sign-in sync if the active session has since changed.
+            const { data: currentSession } = await supabase.auth.getSession();
+            if (currentSession.session?.user?.id !== userId) return;
+            await syncSupabase();
+          }).catch((error) => {
+            console.error('Post-sign-in data sync failed:', error);
+          });
         } else if (event === 'SIGNED_OUT') {
           globalState.currentUser = null;
           globalState.activeRole = 'customer';
@@ -648,22 +605,23 @@ export function useMarketplace() {
 
   // Cart actions with cloud sync (cart_items table)
   const addToCart = async (product: Product, quantity = 1) => {
+    if (!product?.id || !Number.isSafeInteger(quantity) || quantity < 1) {
+      throw new Error('Choose a valid product quantity.');
+    }
+    const availableStock = Number.isFinite(product.stock) ? Math.floor(product.stock) : 0;
+    if (availableStock < 1) throw new Error('This product is currently out of stock.');
     const existingIndex = globalState.cart.findIndex((item) => item.product.id === product.id);
-    let newQty = quantity;
+    const currentQty = existingIndex > -1 ? globalState.cart[existingIndex].quantity : 0;
+    const newQty = Math.min(availableStock, currentQty + quantity);
+    if (newQty < 1) throw new Error('This product is currently out of stock.');
 
     if (existingIndex > -1) {
-      const currentQty = globalState.cart[existingIndex].quantity;
-      newQty = Math.min(product.stock, currentQty + quantity);
       globalState.cart[existingIndex] = {
         ...globalState.cart[existingIndex],
         quantity: newQty
       };
     } else {
-      newQty = Math.min(product.stock, quantity);
-      globalState.cart.push({
-        product,
-        quantity: newQty
-      });
+      globalState.cart.push({ product, quantity: newQty });
     }
     notify();
 
@@ -685,24 +643,28 @@ export function useMarketplace() {
   };
 
   const updateCartQuantity = async (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      globalState.cart = globalState.cart.filter((item) => item.product.id !== productId);
-    } else {
-      const item = globalState.cart.find((i) => i.product.id === productId);
-      if (item) {
-        item.quantity = Math.min(item.product.stock, quantity);
-      }
+    if (!Number.isFinite(quantity)) throw new Error('Choose a valid cart quantity.');
+    const item = globalState.cart.find((i) => i.product.id === productId);
+    const requestedQuantity = Math.floor(quantity);
+    const effectiveQuantity = requestedQuantity <= 0
+      ? 0
+      : Math.min(Math.max(0, Math.floor(item?.product.stock ?? 0)), requestedQuantity);
+
+    if (effectiveQuantity === 0) {
+      globalState.cart = globalState.cart.filter((cartItem) => cartItem.product.id !== productId);
+    } else if (item) {
+      item.quantity = effectiveQuantity;
     }
     notify();
 
     const supabase = getSupabase();
     if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
       try {
-        if (quantity <= 0) {
+        if (effectiveQuantity === 0) {
           await supabase.from('cart_items').delete().eq('owner_id', globalState.currentUser.id).eq('product_id', productId);
         } else {
           await supabase.from('cart_items').update({
-            quantity,
+            quantity: effectiveQuantity,
             updated_at: new Date().toISOString()
           }).eq('owner_id', globalState.currentUser.id).eq('product_id', productId);
         }
@@ -900,6 +862,12 @@ export function useMarketplace() {
       .select('id');
     if (error) throw new Error(`Order item status was not saved: ${error.message}`);
     if (!data || data.length === 0) throw new Error('No order items were updated. Check seller ownership and permissions.');
+    const updatedIds = new Set(data.map((row: { id: string }) => row.id));
+    if (updatedIds.size !== itemIds.length || itemIds.some((id) => !updatedIds.has(id))) {
+      // A seller may only be allowed to update a subset of a multi-seller order.
+      // Never report the whole order as advanced when only some items changed.
+      throw new Error('Only part of this multi-seller order was updated. The overall order status was left unchanged; refresh order details.');
+    }
 
     order.status = nextStatus;
     const statusLabels: Record<OrderStatus, string> = {
