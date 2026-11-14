@@ -766,6 +766,26 @@ export function useMarketplace() {
     if (globalState.cart.length === 0) {
       throw new Error('Your cart is empty. Add a real product before placing an order.');
     }
+    const requiredCheckoutFields = [
+      orderData.customerName,
+      orderData.customerPhone,
+      orderData.shippingAddress,
+      orderData.city,
+      orderData.state,
+      orderData.pincode
+    ];
+    if (requiredCheckoutFields.some((value) => typeof value !== 'string' || !value.trim())) {
+      throw new Error('Please complete your name, phone number and full delivery address.');
+    }
+    if (globalState.cart.some((item) =>
+      !isUuid(item.product.id) ||
+      !Number.isSafeInteger(item.quantity) ||
+      item.quantity < 1 ||
+      !Number.isFinite(item.product.price) ||
+      item.product.price <= 0
+    )) {
+      throw new Error('Your cart contains an invalid product or quantity. Refresh the products and try again.');
+    }
 
     const orderItems: OrderItem[] = globalState.cart.map((c) => ({
       id: generateUuid(),
@@ -840,6 +860,17 @@ export function useMarketplace() {
         newOrder.totalAmount = Number(rpcRes.total_amount);
       }
       clearCheckoutIdempotencyKey();
+
+      // The order RPC is the source of truth. Clear persisted cart rows only
+      // after the server confirms the order; a cleanup failure must not undo
+      // or misreport an already-committed order.
+      const { error: cartCleanupError } = await supabase
+        .from('cart_items')
+        .delete()
+        .eq('owner_id', globalState.currentUser.id);
+      if (cartCleanupError) {
+        console.warn('Order was placed, but saved cart cleanup needs a later retry:', cartCleanupError);
+      }
     }
 
     // Update product stock locally
@@ -994,8 +1025,17 @@ export function useMarketplace() {
     if (productData.sellerId !== currentSeller.id) {
       throw new Error('You can only add products to your own approved seller shop.');
     }
-    if (productData.price <= 0 || productData.mrp < productData.price || productData.stock < 0) {
-      throw new Error('Check product price, MRP and stock values.');
+    if (
+      !Number.isFinite(productData.price) ||
+      !Number.isFinite(productData.mrp) ||
+      !Number.isSafeInteger(productData.stock) ||
+      productData.price <= 0 ||
+      productData.mrp < productData.price ||
+      productData.stock < 0 ||
+      !productData.title.trim() ||
+      !productData.category.trim()
+    ) {
+      throw new Error('Check product title, category, price, MRP and whole-number stock values.');
     }
 
     const productUuid = generateUuid();
@@ -1035,7 +1075,20 @@ export function useMarketplace() {
     if (!supabase || !isUuid(productId)) {
       throw new Error('A connected database and valid product record are required to delete a listing.');
     }
-    const { data, error } = await supabase.from('products').delete().eq('id', productId).select('id');
+    const currentUser = globalState.currentUser;
+    const ownedApprovedShop = globalState.sellers.find((seller) =>
+      seller.userId === currentUser?.id && seller.status === 'approved'
+    );
+    if (currentUser?.role !== 'admin' && (!ownedApprovedShop || !globalState.products.some((product) =>
+      product.id === productId && product.sellerId === ownedApprovedShop.id
+    ))) {
+      throw new Error('Only an administrator or the owner of this approved shop can delete this product.');
+    }
+    let deleteQuery = supabase.from('products').delete().eq('id', productId);
+    if (currentUser.role !== 'admin' && ownedApprovedShop) {
+      deleteQuery = deleteQuery.eq('seller_shop_id', ownedApprovedShop.id);
+    }
+    const { data, error } = await deleteQuery.select('id');
     if (error) throw new Error(`Product deletion failed: ${error.message}`);
     if (!data || data.length === 0) throw new Error('Product was not deleted. Check seller ownership and permissions.');
     globalState.products = globalState.products.filter((product) => product.id !== productId);
