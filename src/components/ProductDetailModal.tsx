@@ -42,10 +42,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const savingsAmount = currentProduct.mrp - currentProduct.price;
   const inCart = cart.find((i) => i.product.id === currentProduct.id);
 
-  const handleAddToCart = () => {
-    addToCart(currentProduct, 1);
-    setAddedNotice(true);
-    setTimeout(() => setAddedNotice(false), 2000);
+  const handleAddToCart = async () => {
+    try {
+      await addToCart(currentProduct, 1);
+      setAddedNotice(true);
+      setTimeout(() => setAddedNotice(false), 2000);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not add this item to your cart.');
+    }
+  };
+
+  const handleToggleWishlist = async () => {
+    try {
+      await toggleWishlist(currentProduct.id);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not update your wishlist.');
+    }
   };
 
   const handlePincodeCheck = (e: React.FormEvent) => {
@@ -67,7 +79,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => toggleWishlist(currentProduct.id)}
+              onClick={handleToggleWishlist}
               className="p-1.5 text-gray-500 hover:text-red-500 rounded-full"
               aria-label="Wishlist"
             >
