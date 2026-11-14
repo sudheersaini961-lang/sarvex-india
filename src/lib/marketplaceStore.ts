@@ -203,31 +203,65 @@ export function useMarketplace() {
         const { data: dbProducts, error: productsError } = await supabase.from('products').select('*');
         if (productsError) throw productsError;
         if (dbProducts) {
-          globalState.products = dbProducts.map((p: any) => {
-            const priceInr = Number(p.price_inr ?? p.price ?? 0);
+          // Never turn malformed or incomplete database rows into believable-looking
+          // listings. Required fields come from the database; invalid rows are omitted.
+          globalState.products = dbProducts.flatMap((p: any): Product[] => {
+            const title = typeof p.product_name === 'string' ? p.product_name.trim() : '';
+            const category = typeof p.category === 'string' ? p.category.trim() : '';
+            const sellerId = typeof p.seller_shop_id === 'string' ? p.seller_shop_id : '';
+            const priceInr = Number(p.price_inr);
+            const stock = Number(p.stock_quantity ?? 0);
             const discount = Number(p.discount_percent ?? 0);
-            const calculatedMrp = discount > 0
-              ? Math.round(priceInr / (1 - discount / 100))
-              : Number(p.mrp ?? priceInr);
+            const mrpValue = p.mrp == null
+              ? priceInr
+              : Number(p.mrp);
+            const rating = Number(p.rating ?? 0);
+            const ratingCount = Number(p.rating_count ?? 0);
 
-            return {
+            if (
+              !p.id ||
+              !sellerId ||
+              !title ||
+              !category ||
+              !Number.isFinite(priceInr) ||
+              priceInr <= 0 ||
+              !Number.isSafeInteger(stock) ||
+              stock < 0 ||
+              !Number.isFinite(mrpValue) ||
+              mrpValue < priceInr ||
+              !Number.isFinite(discount) ||
+              discount < 0 ||
+              discount > 100 ||
+              !Number.isFinite(rating) ||
+              rating < 0 ||
+              rating > 5 ||
+              !Number.isSafeInteger(ratingCount) ||
+              ratingCount < 0 ||
+              typeof p.created_at !== 'string' ||
+              !p.created_at
+            ) {
+              console.warn('A product row with missing or invalid required fields was omitted:', p.id);
+              return [];
+            }
+
+            return [{
               id: p.id,
-              sellerId: p.seller_shop_id ?? p.seller_id ?? '',
-              sellerName: shopNameMap[p.seller_shop_id] || p.seller_name || 'Seller',
-              title: p.product_name ?? p.title ?? 'Untitled Product',
-              description: p.description || '',
-              category: p.category || 'general',
+              sellerId,
+              sellerName: shopNameMap[sellerId] || '',
+              title,
+              description: typeof p.description === 'string' ? p.description : '',
+              category,
               price: priceInr,
-              mrp: calculatedMrp >= priceInr ? calculatedMrp : priceInr,
-              stock: Number(p.stock_quantity ?? p.stock ?? 0),
-              imageUrl: p.image_url || '',
-              badge: p.badge || undefined,
-              rating: Number(p.rating ?? 0),
-              ratingCount: Number(p.rating_count ?? 0),
+              mrp: mrpValue,
+              stock,
+              imageUrl: typeof p.image_url === 'string' ? p.image_url : '',
+              badge: typeof p.badge === 'string' && p.badge ? p.badge : undefined,
+              rating,
+              ratingCount,
               isCodAvailable: true,
               isFeatured: Boolean(p.is_featured),
-              createdAt: p.created_at || new Date().toISOString()
-            };
+              createdAt: p.created_at
+            }];
           });
           notify();
         }
@@ -256,13 +290,25 @@ export function useMarketplace() {
         if (sessionData?.session?.user) {
           const authUser = sessionData.session.user;
           // Fetch from customer_profiles
-          const { data: profile } = await supabase
+          const { data: profile, error: profileError } = await supabase
             .from('customer_profiles')
             .select('*')
             .eq('owner_id', authUser.id)
             .maybeSingle();
 
-          const assignedRole = (profile?.account_role || 'customer') as UserRole;
+          if (profileError) throw new Error(`Account profile could not be verified: ${profileError.message}`);
+          if (!profile) {
+            globalState.currentUser = null;
+            globalState.activeRole = 'customer';
+            globalState.cart = [];
+            globalState.wishlistIds = [];
+            globalState.orders = [];
+            globalState.sellers = [...publicSellerSnapshot];
+            notify();
+            throw new Error('Account profile is missing. Sign in is paused until the profile is repaired.');
+          }
+
+          const assignedRole = profile.account_role as UserRole;
 
           // Private seller records are fetched only for authenticated seller/admin
           // sessions; database grants and RLS remain the authorization boundary.
@@ -552,13 +598,22 @@ export function useMarketplace() {
 
           const userId = authData.user?.id;
           if (userId) {
-            const { data: profile } = await supabase
+            const { data: profile, error: profileError } = await supabase
               .from('customer_profiles')
               .select('*')
               .eq('owner_id', userId)
               .maybeSingle();
 
-            const realRole = (profile?.account_role || 'customer') as UserRole;
+            if (profileError) {
+              await supabase.auth.signOut();
+              return { success: false, message: `Account profile could not be verified: ${profileError.message}` };
+            }
+            if (!profile) {
+              await supabase.auth.signOut();
+              return { success: false, message: 'Account profile is missing. Please contact SARVEX support before signing in.' };
+            }
+
+            const realRole = profile.account_role as UserRole;
             globalState.currentUser = {
               id: userId,
               email: email.trim(),
@@ -614,7 +669,7 @@ export function useMarketplace() {
     notify();
   };
 
-  // Cart actions with cloud sync (cart_items table)
+  // Cart actions. For signed-in users, failed cloud writes roll back the optimistic UI state.
   const addToCart = async (product: Product, quantity = 1) => {
     if (!product?.id || !Number.isSafeInteger(quantity) || quantity < 1) {
       throw new Error('Choose a valid product quantity.');
@@ -626,29 +681,30 @@ export function useMarketplace() {
     const newQty = Math.min(availableStock, currentQty + quantity);
     if (newQty < 1) throw new Error('This product is currently out of stock.');
 
+    const accountId = globalState.currentUser?.id;
+    const previousCart = [...globalState.cart];
     if (existingIndex > -1) {
-      globalState.cart[existingIndex] = {
-        ...globalState.cart[existingIndex],
-        quantity: newQty
-      };
+      globalState.cart[existingIndex] = { ...globalState.cart[existingIndex], quantity: newQty };
     } else {
       globalState.cart.push({ product, quantity: newQty });
     }
     notify();
 
-    // Sync to Supabase cart_items table if user is logged in
     const supabase = getSupabase();
-    if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
-      try {
-        await supabase.from('cart_items').upsert({
-          id: generateUuid(),
-          owner_id: globalState.currentUser.id,
-          product_id: product.id,
-          quantity: newQty,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'owner_id,product_id' });
-      } catch (e) {
-        console.warn('Cart cloud sync skipped:', e);
+    if (supabase && accountId && isUuid(accountId)) {
+      const { error } = await supabase.from('cart_items').upsert({
+        id: generateUuid(),
+        owner_id: accountId,
+        product_id: product.id,
+        quantity: newQty,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'owner_id,product_id' });
+      if (error) {
+        if (globalState.currentUser?.id === accountId) {
+          globalState.cart = previousCart;
+          notify();
+        }
+        throw new Error(`Cart could not be saved to your account: ${error.message}`);
       }
     }
   };
@@ -661,6 +717,8 @@ export function useMarketplace() {
       ? 0
       : Math.min(Math.max(0, Math.floor(item?.product.stock ?? 0)), requestedQuantity);
 
+    const accountId = globalState.currentUser?.id;
+    const previousCart = [...globalState.cart];
     if (effectiveQuantity === 0) {
       globalState.cart = globalState.cart.filter((cartItem) => cartItem.product.id !== productId);
     } else if (item) {
@@ -669,73 +727,89 @@ export function useMarketplace() {
     notify();
 
     const supabase = getSupabase();
-    if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
-      try {
-        if (effectiveQuantity === 0) {
-          await supabase.from('cart_items').delete().eq('owner_id', globalState.currentUser.id).eq('product_id', productId);
-        } else {
-          await supabase.from('cart_items').update({
+    if (supabase && accountId && isUuid(accountId)) {
+      const result = effectiveQuantity === 0
+        ? await supabase.from('cart_items').delete().eq('owner_id', accountId).eq('product_id', productId)
+        : await supabase.from('cart_items').update({
             quantity: effectiveQuantity,
             updated_at: new Date().toISOString()
-          }).eq('owner_id', globalState.currentUser.id).eq('product_id', productId);
+          }).eq('owner_id', accountId).eq('product_id', productId);
+      if (result.error) {
+        if (globalState.currentUser?.id === accountId) {
+          globalState.cart = previousCart;
+          notify();
         }
-      } catch (e) {
-        console.warn('Cart quantity cloud sync skipped:', e);
+        throw new Error(`Cart quantity could not be saved: ${result.error.message}`);
       }
     }
   };
 
   const removeFromCart = async (productId: string) => {
+    const accountId = globalState.currentUser?.id;
+    const previousCart = [...globalState.cart];
     globalState.cart = globalState.cart.filter((item) => item.product.id !== productId);
     notify();
 
     const supabase = getSupabase();
-    if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
-      try {
-        await supabase.from('cart_items').delete().eq('owner_id', globalState.currentUser.id).eq('product_id', productId);
-      } catch (e) {
-        console.warn('Cart remove cloud sync skipped:', e);
+    if (supabase && accountId && isUuid(accountId)) {
+      const { error } = await supabase.from('cart_items').delete()
+        .eq('owner_id', accountId).eq('product_id', productId);
+      if (error) {
+        if (globalState.currentUser?.id === accountId) {
+          globalState.cart = previousCart;
+          notify();
+        }
+        throw new Error(`Cart item could not be removed from your account: ${error.message}`);
       }
     }
   };
 
   const clearCart = async () => {
+    const accountId = globalState.currentUser?.id;
+    const previousCart = [...globalState.cart];
     globalState.cart = [];
     notify();
 
     const supabase = getSupabase();
-    if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
-      try {
-        await supabase.from('cart_items').delete().eq('owner_id', globalState.currentUser.id);
-      } catch (e) {
-        console.warn('Cart clear cloud sync skipped:', e);
+    if (supabase && accountId && isUuid(accountId)) {
+      const { error } = await supabase.from('cart_items').delete().eq('owner_id', accountId);
+      if (error) {
+        if (globalState.currentUser?.id === accountId) {
+          globalState.cart = previousCart;
+          notify();
+        }
+        throw new Error(`Your saved cart could not be cleared: ${error.message}`);
       }
     }
   };
 
-  // Wishlist actions
+  // Wishlist actions. Failed cloud writes restore the previous account state.
   const toggleWishlist = async (productId: string) => {
-    if (globalState.wishlistIds.includes(productId)) {
-      globalState.wishlistIds = globalState.wishlistIds.filter((id) => id !== productId);
-    } else {
-      globalState.wishlistIds.push(productId);
-    }
+    if (!isUuid(productId)) throw new Error('A valid product is required for the wishlist.');
+    const accountId = globalState.currentUser?.id;
+    const previousWishlist = [...globalState.wishlistIds];
+    const shouldAdd = !globalState.wishlistIds.includes(productId);
+    globalState.wishlistIds = shouldAdd
+      ? [...globalState.wishlistIds, productId]
+      : globalState.wishlistIds.filter((id) => id !== productId);
     notify();
 
     const supabase = getSupabase();
-    if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
-      try {
-        if (globalState.wishlistIds.includes(productId)) {
-          await supabase.from('wishlist_items').upsert({
+    if (supabase && accountId && isUuid(accountId)) {
+      const result = shouldAdd
+        ? await supabase.from('wishlist_items').upsert({
             id: generateUuid(),
-            owner_id: globalState.currentUser.id,
+            owner_id: accountId,
             product_id: productId
-          }, { onConflict: 'owner_id,product_id' });
-        } else {
-          await supabase.from('wishlist_items').delete().eq('owner_id', globalState.currentUser.id).eq('product_id', productId);
+          }, { onConflict: 'owner_id,product_id' })
+        : await supabase.from('wishlist_items').delete()
+            .eq('owner_id', accountId).eq('product_id', productId);
+      if (result.error) {
+        if (globalState.currentUser?.id === accountId) {
+          globalState.wishlistIds = previousWishlist;
+          notify();
         }
-      } catch (e) {
-        console.warn('Wishlist cloud sync skipped:', e);
+        throw new Error(`Wishlist could not be saved: ${result.error.message}`);
       }
     }
   };
