@@ -17,16 +17,24 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onSelect }) =
   const cartItem = cart.find((i) => i.product.id === product.id);
   const qtyInCart = cartItem ? cartItem.quantity : 0;
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleAddToCart = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    addToCart(product, 1);
-    setJustAdded(true);
-    setTimeout(() => setJustAdded(false), 1400);
+    try {
+      await addToCart(product, 1);
+      setJustAdded(true);
+      setTimeout(() => setJustAdded(false), 1400);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not add this item to your cart.');
+    }
   };
 
-  const handleToggleWishlist = (e: React.MouseEvent) => {
+  const handleToggleWishlist = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    toggleWishlist(product.id);
+    try {
+      await toggleWishlist(product.id);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not update your wishlist.');
+    }
   };
 
   return (
