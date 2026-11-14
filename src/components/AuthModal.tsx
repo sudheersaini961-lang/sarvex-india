@@ -42,7 +42,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setIsSubmitting(true);
     const result = await loginUserWithSupabase(
       email.trim(),
-      password.trim(),
+      password,
       isSignUp,
       fullName.trim(),
       phone.trim(),
