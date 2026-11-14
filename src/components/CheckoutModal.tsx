@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   X,
   Truck,
@@ -58,6 +58,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [pincode, setPincode] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    try {
+      const savedPin = localStorage.getItem('sarvex_delivery_pincode') || '';
+      if (/^[1-9][0-9]{5}$/.test(savedPin)) setPincode(savedPin);
+    } catch { /* local storage may be unavailable */ }
+  }, [isOpen]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -270,7 +278,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </label>
               <input
                 type="text"
-                pattern="[0-9]{6}"
+                pattern="[1-9][0-9]{5}"
+                inputMode="numeric"
+                autoComplete="postal-code"
                 maxLength={6}
                 required
                 value={pincode}
