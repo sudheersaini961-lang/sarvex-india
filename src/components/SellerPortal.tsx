@@ -70,6 +70,15 @@ export const SellerPortal: React.FC = () => {
     return acc + sellerItems.reduce((s, i) => s + i.price * i.quantity, 0);
   }, 0);
 
+  const handleOrderStatusUpdate = async (orderId: string, status: 'confirmed' | 'shipped') => {
+    setActionError('');
+    try {
+      await updateOrderStatus(orderId, status);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Order status could not be updated.');
+    }
+  };
+
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setActionError('');
@@ -265,8 +274,8 @@ export const SellerPortal: React.FC = () => {
               </div>
               <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-xs">
                 <span className="text-[10px] text-gray-500 uppercase font-bold block">Commission</span>
-                <p className="text-base font-black text-gray-700">—</p>
-                <span className="text-[9px] text-gray-500 font-bold">Not configured</span>
+                <p className="text-base font-black text-gray-700">{activeSeller?.commissionRate ?? 0}%</p>
+                <span className="text-[9px] text-gray-500 font-bold">Current platform rate</span>
               </div>
             </div>
 
@@ -531,7 +540,7 @@ export const SellerPortal: React.FC = () => {
                         <div className="flex gap-1.5">
                           {order.status === 'placed' && (
                             <button
-                              onClick={() => updateOrderStatus(order.id, 'confirmed')}
+                              onClick={() => void handleOrderStatusUpdate(order.id, 'confirmed')}
                               className="px-2.5 py-1 bg-blue-100 text-[#1e3a8a] text-[11px] font-bold rounded hover:bg-blue-200"
                             >
                               Confirm Item
@@ -539,7 +548,7 @@ export const SellerPortal: React.FC = () => {
                           )}
                           {order.status === 'confirmed' && (
                             <button
-                              onClick={() => updateOrderStatus(order.id, 'shipped')}
+                              onClick={() => void handleOrderStatusUpdate(order.id, 'shipped')}
                               className="px-2.5 py-1 bg-[#1e3a8a] text-white text-[11px] font-bold rounded hover:bg-blue-800"
                             >
                               Hand to Courier (Ship)
