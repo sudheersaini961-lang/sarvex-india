@@ -60,6 +60,14 @@ BEGIN
     RAISE EXCEPTION 'Anonymous role can execute checkout RPC';
   END IF;
 
+  IF has_function_privilege('anon', 'public.order_has_seller_item(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Anonymous role can execute seller order helper';
+  END IF;
+
+  IF has_function_privilege('anon', 'public.is_order_customer(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Anonymous role can execute customer order helper';
+  END IF;
+
   IF NOT has_function_privilege('authenticated',
     'public.place_sarvex_order(text,text,text,text,text,text,text,jsonb)', 'EXECUTE') THEN
     RAISE EXCEPTION 'Authenticated role cannot execute checkout RPC';
