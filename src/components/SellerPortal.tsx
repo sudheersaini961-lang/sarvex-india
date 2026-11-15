@@ -483,14 +483,14 @@ export const SellerPortal: React.FC = () => {
         {activeTab === 'orders' && activeSeller && (
           <div className="space-y-3">
             <h3 className="text-xs font-bold text-gray-800 uppercase tracking-wider">
-              Customer Orders Containing Your Items ({sellerOrders.length})
+              Orders containing your products ({sellerOrders.length})
             </h3>
 
             {sellerOrders.length === 0 ? (
               <div className="text-center py-10 bg-white rounded-xl border border-gray-200 p-4">
                 <Truck size={32} className="mx-auto text-gray-400 mb-2" />
                 <h4 className="font-bold text-gray-800 text-sm">No pending orders</h4>
-                <p className="text-xs text-gray-500">When customers place COD orders, they appear here.</p>
+                <p className="text-xs text-gray-500">Customer orders will appear here. Arrange delivery with your own courier service.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -551,12 +551,12 @@ export const SellerPortal: React.FC = () => {
                               onClick={() => void handleOrderStatusUpdate(order.id, 'shipped')}
                               className="px-2.5 py-1 bg-[#1e3a8a] text-white text-[11px] font-bold rounded hover:bg-blue-800"
                             >
-                              Hand to Courier (Ship)
+                              Mark as shipped
                             </button>
                           )}
                           {order.status === 'shipped' && (
                             <span className="text-[11px] text-emerald-700 font-bold">
-                              In Logistics Transit ✓
+                              Seller marked shipped (courier arranged by seller)
                             </span>
                           )}
                         </div>
@@ -703,14 +703,14 @@ export const SellerPortal: React.FC = () => {
 
             <div>
               <label className="text-[11px] font-bold text-gray-700 block mb-1">
-                Warehouse / Pickup Address *
+                Seller Dispatch / Pickup Address *
               </label>
               <textarea
                 required
                 rows={2}
                 value={pickupAddress}
                 onChange={(e) => setPickupAddress(e.target.value)}
-                placeholder="Where SARVEX courier will pick packages for customer delivery"
+                placeholder="Address for your own courier pickup or parcel drop-off"
                 className="w-full text-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a8a] focus:outline-none"
               />
             </div>
