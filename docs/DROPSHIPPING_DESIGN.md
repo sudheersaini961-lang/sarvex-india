@@ -78,3 +78,31 @@ Extend the existing strict policy-verification and smoke-test framework delibera
 ## Current limitations
 
 The repository currently has a single seller-shop model, seller-owned products, and seller order fulfilment. It does not yet model suppliers, wholesale offers, reseller listings, supplier allocations, supplier dispatch events, automated payment splitting, or COD remittance. This design is not a claim that any of those capabilities are live.
+
+## External marketplace links and delivery automation
+
+A pasted product URL is an **import request**, not permission to copy or resell the item. The import flow must first identify the source and use an approved method:
+
+- Prefer a supplier-provided catalogue/feed, a signed supplier integration, or an official marketplace API for which SARVEX and the relevant seller/partner have valid access.
+- Flipkart's published Marketplace APIs are seller/partner APIs. Its documentation requires seller registration and application/token setup; it describes listing and order-management functions. Do not treat them as a public API for scraping arbitrary consumer product pages or as automatic permission to resell another seller's stock.
+- Meesho connector availability, eligibility, and permitted resale/catalogue access must be confirmed directly with Meesho or an authorised integration partner before implementation. Do not assume a public API exists or scrape its website/app.
+- If no authorised connector exists, allow a manual supplier-approved product form or catalogue file instead. Show a review screen for title, images, variant, price, stock, shipping origin, rights/permission and supplier identity before publishing.
+- Never ask users to paste marketplace passwords, session cookies, OTPs, or private access tokens into product-link import. Store any approved integration credentials server-side only, encrypted and scoped to the connected seller.
+
+A safe connector should use source-specific adapters behind a server-side interface. Each import must record source, external item/SKU ID, supplier identity, permission/connection owner, last verified price/stock timestamp, and sync status. Price or stock changes must pause or update the listing according to configured rules; stale or unavailable source data must not be presented as live stock. Keep the public SARVEX listing's own retail price separate from the source/wholesale cost.
+
+### Delivery automation
+
+Use a courier adapter layer, not a hard-coded promise of a particular courier. A provider integration can, when the account and service support it, check serviceability/rates, create a shipment, book pickup, retrieve labels/AWB, receive tracking webhooks, and initiate eligible returns. Shiprocket publishes APIs for order creation, courier/shipment operations and tracking; actual account eligibility, fees, pickup coverage and COD settlement must be checked before enabling it.
+
+For supplier-dropship orders, the pickup origin must be the supplier's approved dispatch address. The supplier must authorise SARVEX to create the shipment from that address and provide package weight/dimensions and dispatch readiness. Never silently use SARVEX or reseller address as the pickup point. If a supplier is not connected to the selected courier account, route the order to a manual supplier-fulfilment state rather than claiming automatic dispatch.
+
+Automated delivery is a staged capability:
+1. provider account and API access approved;
+2. secure server-side credentials and webhook signature verification;
+3. sandbox shipment/label/tracking tests;
+4. pickup-origin ownership and serviceability checks;
+5. COD remittance, RTO, cancellation and return reconciliation tests;
+6. live low-risk pilot with explicit supplier consent.
+
+Until these gates pass, label shipment actions as manual/pending. Never show a generated tracking number, delivery ETA, pickup booking, or successful courier handoff unless the provider confirms it.
