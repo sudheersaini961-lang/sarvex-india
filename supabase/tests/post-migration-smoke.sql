@@ -168,6 +168,20 @@ BEGIN
     RAISE EXCEPTION 'Anonymous role can execute checkout';
   END IF;
 
+
+  IF to_regprocedure('public.browse_supplier_offers()') IS NULL
+     OR to_regprocedure('public.admin_list_supplier_review_queue()') IS NULL THEN
+    RAISE EXCEPTION 'Supplier offer discovery or admin review queue RPC is missing';
+  END IF;
+  IF has_function_privilege('anon', 'public.browse_supplier_offers()', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.admin_list_supplier_review_queue()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Anonymous role can execute supplier discovery/admin queue RPC';
+  END IF;
+  IF NOT has_function_privilege('authenticated', 'public.browse_supplier_offers()', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.admin_list_supplier_review_queue()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Authenticated role is missing supplier discovery/admin queue RPC grants';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM storage.buckets
     WHERE id = 'product-images' AND public = true
