@@ -65,6 +65,9 @@ jobs:
       - name: Verify trusted first-admin bootstrap (transaction rolled back)
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/admin-bootstrap.sql
 
+      - name: Verify supplier and reseller workspace RPCs (transaction rolled back)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/supplier-workspace.sql
+
       - name: Apply migration again (idempotency check)
         run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
 
