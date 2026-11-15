@@ -119,6 +119,17 @@ BEGIN
   IF NOT v_blocked THEN RAISE EXCEPTION 'Reseller modified another supplier stock'; END IF;
 
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  UPDATE public.seller_shops SET approval_status = 'pending' WHERE id = v_supplier_shop;
+  v_blocked := false;
+  BEGIN
+    PERFORM public.admin_review_reseller_listing(v_listing_id, 'active');
+  EXCEPTION WHEN OTHERS THEN
+    v_blocked := true;
+  END;
+  IF NOT v_blocked THEN
+    RAISE EXCEPTION 'Admin approved a reseller listing while its supplier shop was not approved';
+  END IF;
+  UPDATE public.seller_shops SET approval_status = 'approved' WHERE id = v_supplier_shop;
   PERFORM public.admin_review_reseller_listing(v_listing_id, 'active');
 
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
