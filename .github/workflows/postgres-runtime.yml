@@ -42,7 +42,7 @@ jobs:
           grep -q "^major_version = ${{ matrix.pg }}$" supabase/config.toml
 
       - name: Start isolated local Supabase stack
-        run: supabase start -x studio,inbucket,imgproxy,edge-runtime,logflare,vector
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,mailpit
 
       - name: Install PostgreSQL client
         run: |
