@@ -110,7 +110,7 @@ BEGIN
     ('public', 'reviews', 'Public can view all reviews', 'SELECT', 'public', 'PERMISSIVE',
      '^[\s\(\)]*true[\s\(\)]*$', NULL),
     ('public', 'reviews', 'Verified buyers can submit reviews', 'INSERT', 'public', 'PERMISSIVE',
-     NULL, '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s+is\s+not\s+null\s*and\s*\(?customer_id\s*=\s*(auth\.)?uid\(\)\)?\)?\)?[\s\(\)]*$'),
+     NULL, '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s+is\s+not\s+null\)?\s+and\s*\(?customer_id\s*=\s*(auth\.)?uid\(\)\)?\)?\)?[\s\(\)]*$'),
     ('public', 'reviews', 'Customers can update their own reviews', 'UPDATE', 'public', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s*=\s*customer_id\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$',
      '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s*=\s*customer_id\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$'),
