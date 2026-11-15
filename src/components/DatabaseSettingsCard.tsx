@@ -14,7 +14,9 @@ import {
   getStoredSupabaseConfig,
   saveSupabaseConfig,
   clearSupabaseConfig,
-  testSupabaseConnection
+  testSupabaseConnection,
+  isSafeSupabaseAnonKey,
+  isValidSupabaseProjectUrl
 } from '../lib/supabaseClient';
 
 interface DatabaseSettingsCardProps {
@@ -74,10 +76,18 @@ export const DatabaseSettingsCard: React.FC<DatabaseSettingsCardProps> = ({
       return;
     }
 
-    if (anonKey.toLowerCase().includes('service_role')) {
+    if (!isValidSupabaseProjectUrl(url.trim())) {
       setResultStatus({
         success: false,
-        message: 'Security Alert: Do NOT use the service_role secret key in the browser! Use the "anon" public key.'
+        message: 'Invalid Supabase Project URL. Use the exact HTTPS project URL ending in .supabase.co.'
+      });
+      return;
+    }
+
+    if (!isSafeSupabaseAnonKey(anonKey.trim())) {
+      setResultStatus({
+        success: false,
+        message: 'Unsafe or unsupported API key. Use a Supabase publishable key or legacy anon JWT key only. Never use a secret/service_role key.'
       });
       return;
     }
