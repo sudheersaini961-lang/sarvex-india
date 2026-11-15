@@ -9,6 +9,10 @@ SARVEX INDIA is an Indian multi-vendor marketplace web and mobile application bu
 - **Node.js** (v22 recommended) and **npm**
 - **JDK 21** and **Android SDK** (only required if building the Android APK locally instead of using GitHub Actions)
 
+## Supabase administrator setup
+
+For the one-time, privileged first-admin procedure, see [docs/ADMIN_BOOTSTRAP.md](docs/ADMIN_BOOTSTRAP.md). Do not expose a service-role key in the client app.
+
 ## Installation & Local Development
 
 1. Install dependencies:
