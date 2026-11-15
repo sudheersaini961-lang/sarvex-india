@@ -3950,4 +3950,101 @@ GRANT EXECUTE ON FUNCTION public.admin_review_reseller_listing(UUID,TEXT) TO aut
 GRANT EXECUTE ON FUNCTION public.get_my_supplier_workspace() TO authenticated, service_role;
 
 
+
+CREATE OR REPLACE FUNCTION public.browse_supplier_offers()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, auth, pg_temp
+AS $
+DECLARE
+  v_uid UUID := auth.uid();
+  v_rows JSONB;
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.seller_shops
+    WHERE owner_id = v_uid AND approval_status = 'approved'
+  ) THEN
+    RAISE EXCEPTION 'An approved SARVEX seller shop is required to browse wholesale offers';
+  END IF;
+
+  SELECT COALESCE(jsonb_agg(
+    jsonb_build_object(
+      'offer_id', so.id,
+      'supplier_stock_id', st.id,
+      'product_name', st.product_name,
+      'description', st.description,
+      'category', st.category,
+      'image_url', st.image_url,
+      'available_quantity', st.available_quantity,
+      'wholesale_price_inr', so.wholesale_price_inr,
+      'minimum_order_quantity', so.minimum_order_quantity,
+      'direct_to_customer_dispatch', so.direct_to_customer_dispatch
+    ) ORDER BY so.created_at DESC
+  ), '[]'::jsonb)
+  INTO v_rows
+  FROM public.supplier_offers so
+  JOIN public.supplier_profiles sp ON sp.id = so.supplier_id
+  JOIN public.seller_shops ss ON ss.id = sp.seller_shop_id
+  JOIN public.supplier_stock st ON st.id = so.supplier_stock_id AND st.supplier_id = sp.id
+  WHERE so.offer_status = 'active'
+    AND sp.approval_status = 'approved'
+    AND ss.approval_status = 'approved'
+    AND st.active = true
+    AND st.available_quantity >= so.minimum_order_quantity;
+
+  RETURN v_rows;
+END;
+$;
+
+CREATE OR REPLACE FUNCTION public.admin_list_supplier_review_queue()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, auth, pg_temp
+AS $
+DECLARE
+  v_uid UUID := auth.uid();
+  v_suppliers JSONB;
+  v_offers JSONB;
+  v_listings JSONB;
+BEGIN
+  IF v_uid IS NULL OR NOT public.is_sarvex_admin() THEN
+    RAISE EXCEPTION 'SARVEX administrator access required';
+  END IF;
+
+  SELECT COALESCE(jsonb_agg(to_jsonb(sp) ORDER BY sp.created_at), '[]'::jsonb)
+  INTO v_suppliers FROM public.supplier_profiles sp
+  WHERE sp.approval_status = 'pending';
+
+  SELECT COALESCE(jsonb_agg(
+    jsonb_build_object('id', so.id, 'supplier_id', so.supplier_id,
+      'product_name', st.product_name, 'wholesale_price_inr', so.wholesale_price_inr,
+      'minimum_order_quantity', so.minimum_order_quantity, 'created_at', so.created_at)
+    ORDER BY so.created_at
+  ), '[]'::jsonb)
+  INTO v_offers
+  FROM public.supplier_offers so
+  JOIN public.supplier_stock st ON st.id = so.supplier_stock_id
+  WHERE so.offer_status = 'pending';
+
+  SELECT COALESCE(jsonb_agg(
+    jsonb_build_object('id', rl.id, 'reseller_shop_id', rl.reseller_shop_id,
+      'supplier_offer_id', rl.supplier_offer_id, 'retail_price_inr', rl.retail_price_inr,
+      'public_title', rl.public_title, 'created_at', rl.created_at)
+    ORDER BY rl.created_at
+  ), '[]'::jsonb)
+  INTO v_listings FROM public.reseller_listings rl
+  WHERE rl.listing_status = 'pending';
+
+  RETURN jsonb_build_object('suppliers', v_suppliers, 'offers', v_offers, 'listings', v_listings);
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.browse_supplier_offers() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.admin_list_supplier_review_queue() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.browse_supplier_offers() TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_list_supplier_review_queue() TO authenticated, service_role;
+
 COMMIT;
