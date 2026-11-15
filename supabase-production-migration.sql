@@ -3563,7 +3563,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth, pg_temp
-AS $
+AS $$
 DECLARE
   v_uid UUID := auth.uid();
   v_shop_id UUID;
@@ -3572,12 +3572,12 @@ BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
   IF length(trim(COALESCE(p_business_name, ''))) NOT BETWEEN 2 AND 120
      OR length(trim(COALESCE(p_dispatch_contact_name, ''))) NOT BETWEEN 2 AND 100
-     OR trim(COALESCE(p_dispatch_phone, '')) !~ '^[6-9][0-9]{9}
+     OR trim(COALESCE(p_dispatch_phone, '')) !~ '^[6-9][0-9]{9}$'
 
      OR length(trim(COALESCE(p_dispatch_address, ''))) NOT BETWEEN 8 AND 300
      OR length(trim(COALESCE(p_dispatch_city, ''))) NOT BETWEEN 2 AND 80
      OR length(trim(COALESCE(p_dispatch_state, ''))) NOT BETWEEN 2 AND 80
-     OR trim(COALESCE(p_dispatch_pincode, '')) !~ '^[1-9][0-9]{5}
+     OR trim(COALESCE(p_dispatch_pincode, '')) !~ '^[1-9][0-9]{5}$'
  THEN
     RAISE EXCEPTION 'Supplier application details are invalid';
   END IF;
@@ -3620,7 +3620,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth, pg_temp
-AS $
+AS $$
 DECLARE
   v_uid UUID := auth.uid();
   v_supplier_id UUID;
@@ -3633,7 +3633,7 @@ BEGIN
      OR p_available_quantity > 1000000
      OR (p_supplier_sku IS NOT NULL AND length(trim(p_supplier_sku)) > 80)
      OR (p_description IS NOT NULL AND length(p_description) > 5000)
-     OR (p_image_url IS NOT NULL AND p_image_url !~ '^https://[^[:space:]]+
+     OR (p_image_url IS NOT NULL AND p_image_url !~ '^https://[^[:space:]]+$
 ) THEN
     RAISE EXCEPTION 'Supplier stock details are invalid';
   END IF;
@@ -3684,7 +3684,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth, pg_temp
-AS $
+AS $$
 DECLARE
   v_uid UUID := auth.uid();
   v_supplier_id UUID;
@@ -3731,7 +3731,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth, pg_temp
-AS $
+AS $$
 DECLARE
   v_uid UUID := auth.uid();
   v_reseller_shop_id UUID;
@@ -3744,7 +3744,7 @@ BEGIN
      OR p_retail_price_inr <> round(p_retail_price_inr, 2)
      OR length(trim(COALESCE(p_public_title, ''))) NOT BETWEEN 2 AND 180
      OR (p_public_description IS NOT NULL AND length(p_public_description) > 5000)
-     OR (p_public_image_url IS NOT NULL AND p_public_image_url !~ '^https://[^[:space:]]+
+     OR (p_public_image_url IS NOT NULL AND p_public_image_url !~ '^https://[^[:space:]]+$
 ) THEN
     RAISE EXCEPTION 'Reseller listing details are invalid';
   END IF;
@@ -3789,7 +3789,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth, pg_temp
-AS $
+AS $$
 BEGIN
   IF auth.uid() IS NULL OR NOT public.is_sarvex_admin() THEN
     RAISE EXCEPTION 'SARVEX administrator access required';
@@ -3816,7 +3816,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth, pg_temp
-AS $
+AS $$
 BEGIN
   IF auth.uid() IS NULL OR NOT public.is_sarvex_admin() THEN
     RAISE EXCEPTION 'SARVEX administrator access required';
@@ -3847,7 +3847,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth, pg_temp
-AS $
+AS $$
 BEGIN
   IF auth.uid() IS NULL OR NOT public.is_sarvex_admin() THEN
     RAISE EXCEPTION 'SARVEX administrator access required';
@@ -3877,7 +3877,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth, pg_temp
-AS $
+AS $$
 DECLARE
   v_uid UUID := auth.uid();
   v_supplier JSONB;
@@ -3956,7 +3956,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth, pg_temp
-AS $
+AS $$
 DECLARE
   v_uid UUID := auth.uid();
   v_rows JSONB;
@@ -4003,7 +4003,7 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth, pg_temp
-AS $
+AS $$
 DECLARE
   v_uid UUID := auth.uid();
   v_suppliers JSONB;
