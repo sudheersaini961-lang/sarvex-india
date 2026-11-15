@@ -14,6 +14,7 @@ import {
   Truck
 } from 'lucide-react';
 import { useMarketplace } from '../lib/marketplaceStore';
+import { getSupabase } from '../lib/supabaseClient';
 
 export const SellerPortal: React.FC = () => {
   const {
@@ -32,7 +33,7 @@ export const SellerPortal: React.FC = () => {
   const activeSeller = sellers.find((seller) => seller.userId === currentUser?.id) || null;
 
   // Forms state
-  const [activeTab, setActiveTab] = useState<'catalog' | 'orders' | 'add_product' | 'register'>(
+  const [activeTab, setActiveTab] = useState<'catalog' | 'orders' | 'add_product' | 'register' | 'supplier'>(
     activeSeller ? 'catalog' : 'register'
   );
 
@@ -58,6 +59,167 @@ export const SellerPortal: React.FC = () => {
   const [newImageUrl, setNewImageUrl] = useState('');
   const [productSuccessMsg, setProductSuccessMsg] = useState('');
   const [actionError, setActionError] = useState('');
+  const [supplierWorkspace, setSupplierWorkspace] = useState<any>(null);
+  const [supplierOffers, setSupplierOffers] = useState<any[]>([]);
+  const [supplierLoading, setSupplierLoading] = useState(false);
+  const [supplierError, setSupplierError] = useState('');
+  const [supplierNotice, setSupplierNotice] = useState('');
+  const [supplierBusinessName, setSupplierBusinessName] = useState('');
+  const [dispatchContactName, setDispatchContactName] = useState(currentUser?.fullName || '');
+  const [dispatchPhone, setDispatchPhone] = useState(currentUser?.phone || '');
+  const [dispatchAddress, setDispatchAddress] = useState('');
+  const [dispatchCity, setDispatchCity] = useState('');
+  const [dispatchState, setDispatchState] = useState('');
+  const [dispatchPincode, setDispatchPincode] = useState('');
+  const [stockName, setStockName] = useState('');
+  const [stockSku, setStockSku] = useState('');
+  const [stockCategory, setStockCategory] = useState(categories[0]?.slug || 'electronics');
+  const [stockDescription, setStockDescription] = useState('');
+  const [stockImageUrl, setStockImageUrl] = useState('');
+  const [stockQuantity, setStockQuantity] = useState(1);
+  const [stockIdForOffer, setStockIdForOffer] = useState('');
+  const [wholesalePrice, setWholesalePrice] = useState<number | ''>('');
+  const [retailOfferId, setRetailOfferId] = useState('');
+  const [retailPrice, setRetailPrice] = useState<number | ''>('');
+  const [retailTitle, setRetailTitle] = useState('');
+
+  useEffect(() => {
+    if (activeTab !== 'supplier' || !currentUser) return;
+    let alive = true;
+    const loadWorkspace = async () => {
+      setSupplierLoading(true);
+      setSupplierError('');
+      const supabase = getSupabase();
+      if (!supabase) {
+        if (alive) {
+          setSupplierError('Supabase database configure nahi hai. Supplier workspace abhi available nahi hai.');
+          setSupplierLoading(false);
+        }
+        return;
+      }
+      const [workspaceResult, offersResult] = await Promise.all([
+        supabase.rpc('get_my_supplier_workspace'),
+        supabase.rpc('browse_supplier_offers')
+      ]);
+      if (!alive) return;
+      if (workspaceResult.error) setSupplierError(workspaceResult.error.message);
+      else setSupplierWorkspace(workspaceResult.data || null);
+      if (offersResult.error) {
+        // Browsing offers requires an approved seller shop; show the error only
+        // when the user tries the reseller flow, not as a supplier application blocker.
+        setSupplierOffers([]);
+      } else {
+        setSupplierOffers(Array.isArray(offersResult.data) ? offersResult.data : []);
+      }
+      setSupplierLoading(false);
+    };
+    void loadWorkspace();
+    return () => { alive = false; };
+  }, [activeTab, currentUser?.id]);
+
+  const callSupplierRpc = async (name: string, args: Record<string, unknown>) => {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error('Supabase database configure nahi hai.');
+    const { data, error } = await supabase.rpc(name, args);
+    if (error) throw error;
+    return data;
+  };
+
+  const refreshSupplierWorkspace = async () => {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    const [workspaceResult, offersResult] = await Promise.all([
+      supabase.rpc('get_my_supplier_workspace'),
+      supabase.rpc('browse_supplier_offers')
+    ]);
+    if (workspaceResult.error) throw workspaceResult.error;
+    setSupplierWorkspace(workspaceResult.data || null);
+    setSupplierOffers(offersResult.error || !Array.isArray(offersResult.data) ? [] : offersResult.data);
+  };
+
+  const handleSupplierApplication = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSupplierError('');
+    setSupplierNotice('');
+    try {
+      await callSupplierRpc('supplier_apply', {
+        p_business_name: supplierBusinessName.trim(),
+        p_dispatch_contact_name: dispatchContactName.trim(),
+        p_dispatch_phone: dispatchPhone.replace(/\\D/g, ''),
+        p_dispatch_address: dispatchAddress.trim(),
+        p_dispatch_city: dispatchCity.trim(),
+        p_dispatch_state: dispatchState.trim(),
+        p_dispatch_pincode: dispatchPincode.replace(/\\D/g, '')
+      });
+      setSupplierNotice('Supplier application admin review ke liye submit ho gayi hai.');
+      await refreshSupplierWorkspace();
+    } catch (error) {
+      setSupplierError(error instanceof Error ? error.message : 'Supplier application submit nahi hui.');
+    }
+  };
+
+  const handleSupplierStockSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSupplierError('');
+    setSupplierNotice('');
+    try {
+      await callSupplierRpc('supplier_save_stock', {
+        p_stock_id: null,
+        p_supplier_sku: stockSku.trim() || null,
+        p_product_name: stockName.trim(),
+        p_description: stockDescription.trim() || null,
+        p_category: stockCategory,
+        p_image_url: stockImageUrl.trim() || null,
+        p_available_quantity: stockQuantity,
+        p_active: true
+      });
+      setSupplierNotice('Supplier stock private database mein save ho gaya.');
+      setStockName(''); setStockSku(''); setStockDescription(''); setStockImageUrl('');
+      setStockQuantity(1);
+      await refreshSupplierWorkspace();
+    } catch (error) {
+      setSupplierError(error instanceof Error ? error.message : 'Supplier stock save nahi hua.');
+    }
+  };
+
+  const handleSupplierOfferCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSupplierError('');
+    setSupplierNotice('');
+    try {
+      await callSupplierRpc('supplier_create_offer', {
+        p_supplier_stock_id: stockIdForOffer,
+        p_wholesale_price_inr: Number(wholesalePrice),
+        p_minimum_order_quantity: 1,
+        p_direct_to_customer_dispatch: true
+      });
+      setSupplierNotice('Wholesale offer admin approval ke liye submit ho gaya.');
+      setWholesalePrice('');
+      await refreshSupplierWorkspace();
+    } catch (error) {
+      setSupplierError(error instanceof Error ? error.message : 'Wholesale offer create nahi hua.');
+    }
+  };
+
+  const handleResellerListingCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSupplierError('');
+    setSupplierNotice('');
+    try {
+      await callSupplierRpc('reseller_create_listing', {
+        p_supplier_offer_id: retailOfferId,
+        p_retail_price_inr: Number(retailPrice),
+        p_public_title: retailTitle.trim(),
+        p_public_description: null,
+        p_public_image_url: null
+      });
+      setSupplierNotice('Reseller listing admin approval ke liye submit ho gayi.');
+      setRetailPrice(''); setRetailTitle('');
+      await refreshSupplierWorkspace();
+    } catch (error) {
+      setSupplierError(error instanceof Error ? error.message : 'Reseller listing submit nahi hui.');
+    }
+  };
 
   // Seller metrics
   const sellerProducts = products.filter((p) => p.sellerId === activeSeller?.id);
@@ -208,6 +370,14 @@ export const SellerPortal: React.FC = () => {
           }`}
         >
           My Products ({sellerProducts.length})
+        </button>}
+        {activeSeller && activeSeller.status === 'approved' && <button
+          onClick={() => setActiveTab('supplier')}
+          className={`flex-1 py-2.5 text-xs font-bold text-center border-b-2 transition ${
+            activeTab === 'supplier' ? 'border-[#f97316] text-[#f97316] bg-orange-50/40' : 'border-transparent text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          Supplier & Dropship
         </button>}
         {activeSeller && activeSeller.status === 'approved' && <button
           onClick={() => setActiveTab('add_product')}
@@ -566,6 +736,75 @@ export const SellerPortal: React.FC = () => {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+
+        {activeTab === 'supplier' && activeSeller && activeSeller.status === 'approved' && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs text-blue-900">
+              Supplier aur reseller tools abhi private review workflow hain. Public customer catalogue, dropship checkout, COD aur courier booking abhi enable nahi hain.
+            </div>
+            {supplierError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">{supplierError}</div>}
+            {supplierNotice && <div role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">{supplierNotice}</div>}
+            {supplierLoading && <p className="text-xs text-gray-500">Supplier workspace load ho raha hai…</p>}
+            {!supplierLoading && !supplierWorkspace?.supplier_profile && (
+              <form onSubmit={handleSupplierApplication} className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+                <h3 className="text-sm font-bold text-gray-900">Apply as Supplier</h3>
+                <p className="text-xs text-gray-500">Sirf approved SARVEX sellers supplier banne ke liye apply kar sakte hain. Dispatch details private rahengi.</p>
+                <input required minLength={2} maxLength={120} value={supplierBusinessName} onChange={e=>setSupplierBusinessName(e.target.value)} placeholder="Business name" className="w-full rounded-lg border p-2 text-xs" />
+                <input required minLength={2} maxLength={100} value={dispatchContactName} onChange={e=>setDispatchContactName(e.target.value)} placeholder="Dispatch contact name" className="w-full rounded-lg border p-2 text-xs" />
+                <input required inputMode="numeric" maxLength={10} pattern="[6-9][0-9]{9}" value={dispatchPhone} onChange={e=>setDispatchPhone(e.target.value.replace(/\\D/g,'').slice(0,10))} placeholder="10-digit Indian mobile" className="w-full rounded-lg border p-2 text-xs" />
+                <textarea required minLength={8} maxLength={300} value={dispatchAddress} onChange={e=>setDispatchAddress(e.target.value)} placeholder="Supplier dispatch address" className="w-full rounded-lg border p-2 text-xs" />
+                <div className="grid grid-cols-3 gap-2">
+                  <input required minLength={2} value={dispatchCity} onChange={e=>setDispatchCity(e.target.value)} placeholder="City" className="min-w-0 rounded-lg border p-2 text-xs" />
+                  <input required minLength={2} value={dispatchState} onChange={e=>setDispatchState(e.target.value)} placeholder="State" className="min-w-0 rounded-lg border p-2 text-xs" />
+                  <input required inputMode="numeric" maxLength={6} pattern="[1-9][0-9]{5}" value={dispatchPincode} onChange={e=>setDispatchPincode(e.target.value.replace(/\\D/g,'').slice(0,6))} placeholder="PIN" className="min-w-0 rounded-lg border p-2 text-xs" />
+                </div>
+                <button disabled={supplierLoading} className="w-full rounded-lg bg-[#1e3a8a] p-3 text-xs font-bold text-white">Submit Supplier Application</button>
+              </form>
+            )}
+            {supplierWorkspace?.supplier_profile && (
+              <div className="rounded-xl border border-gray-200 bg-white p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div><h3 className="text-sm font-bold">Supplier Account</h3><p className="text-xs text-gray-500">{supplierWorkspace.supplier_profile.business_name}</p></div>
+                  <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-800">{supplierWorkspace.supplier_profile.approval_status}</span>
+                </div>
+                {supplierWorkspace.supplier_profile.approval_status !== 'approved' && <p className="mt-2 text-xs text-gray-600">Admin approval ke baad hi supplier stock aur offers add kar sakenge.</p>}
+              </div>
+            )}
+            {supplierWorkspace?.supplier_profile?.approval_status === 'approved' && (
+              <>
+                <form onSubmit={handleSupplierStockSave} className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
+                  <h3 className="text-sm font-bold">Add Supplier Stock</h3>
+                  <input required minLength={2} maxLength={180} value={stockName} onChange={e=>setStockName(e.target.value)} placeholder="Product name" className="w-full rounded-lg border p-2 text-xs" />
+                  <input maxLength={80} value={stockSku} onChange={e=>setStockSku(e.target.value)} placeholder="Supplier SKU (optional)" className="w-full rounded-lg border p-2 text-xs" />
+                  <select value={stockCategory} onChange={e=>setStockCategory(e.target.value)} className="w-full rounded-lg border p-2 text-xs">{categories.map(cat=><option key={cat.id} value={cat.slug}>{cat.name}</option>)}</select>
+                  <input type="number" min={0} max={1000000} required value={stockQuantity} onChange={e=>setStockQuantity(Number(e.target.value))} className="w-full rounded-lg border p-2 text-xs" aria-label="Available quantity" />
+                  <input type="url" value={stockImageUrl} onChange={e=>setStockImageUrl(e.target.value)} placeholder="HTTPS image URL (authorized image only)" className="w-full rounded-lg border p-2 text-xs" />
+                  <textarea maxLength={5000} value={stockDescription} onChange={e=>setStockDescription(e.target.value)} placeholder="Product description" className="w-full rounded-lg border p-2 text-xs" />
+                  <button className="w-full rounded-lg bg-[#1e3a8a] p-3 text-xs font-bold text-white">Save Private Stock</button>
+                </form>
+                <form onSubmit={handleSupplierOfferCreate} className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
+                  <h3 className="text-sm font-bold">Create Wholesale Offer</h3>
+                  <select required value={stockIdForOffer} onChange={e=>setStockIdForOffer(e.target.value)} className="w-full rounded-lg border p-2 text-xs"><option value="">Select your stock item</option>{(supplierWorkspace.stock || []).filter((item:any)=>item.active).map((item:any)=><option key={item.id} value={item.id}>{item.product_name} · Qty {item.available_quantity}</option>)}</select>
+                  <input type="number" required min={0.01} step="0.01" value={wholesalePrice} onChange={e=>setWholesalePrice(e.target.value ? Number(e.target.value) : '')} placeholder="Wholesale price ₹" className="w-full rounded-lg border p-2 text-xs" />
+                  <button className="w-full rounded-lg bg-[#f97316] p-3 text-xs font-bold text-white">Submit Offer for Admin Review</button>
+                </form>
+              </>
+            )}
+            <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
+              <h3 className="text-sm font-bold">Wholesale Offers from SARVEX Suppliers</h3>
+              {supplierOffers.length === 0 ? <p className="text-xs text-gray-500">Abhi koi approved active supplier offer available nahi hai.</p> : supplierOffers.map((offer:any)=><div key={offer.offer_id} className="flex items-center justify-between border-b py-2 text-xs"><div className="min-w-0"><p className="font-semibold">{offer.product_name}</p><p className="text-gray-500">Stock {offer.available_quantity} · MOQ {offer.minimum_order_quantity}</p></div><p className="font-bold">₹{Number(offer.wholesale_price_inr).toLocaleString('en-IN')}</p></div>)}
+            </div>
+            <form onSubmit={handleResellerListingCreate} className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
+              <h3 className="text-sm font-bold">Create Reseller Listing</h3>
+              <select required value={retailOfferId} onChange={e=>setRetailOfferId(e.target.value)} className="w-full rounded-lg border p-2 text-xs"><option value="">Choose approved supplier offer</option>{supplierOffers.map((offer:any)=><option key={offer.offer_id} value={offer.offer_id}>{offer.product_name} · Wholesale ₹{offer.wholesale_price_inr}</option>)}</select>
+              <input required minLength={2} maxLength={180} value={retailTitle} onChange={e=>setRetailTitle(e.target.value)} placeholder="Your public product title" className="w-full rounded-lg border p-2 text-xs" />
+              <input type="number" required min={0.01} step="0.01" value={retailPrice} onChange={e=>setRetailPrice(e.target.value ? Number(e.target.value) : '')} placeholder="Your retail price ₹" className="w-full rounded-lg border p-2 text-xs" />
+              <button disabled={supplierOffers.length===0} className="w-full rounded-lg bg-[#f97316] p-3 text-xs font-bold text-white">Submit Reseller Listing for Review</button>
+            </form>
+            <p className="text-[11px] text-gray-500">Wholesale prices are visible only to approved sellers. Listings remain private and pending until admin approval; customers cannot order them yet.</p>
           </div>
         )}
 
