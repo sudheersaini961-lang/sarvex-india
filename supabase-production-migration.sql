@@ -3376,4 +3376,171 @@ BEGIN
   END IF;
 END $$;
 
+
+-- ============================================================================
+-- 16. PRIVATE SUPPLIER / DROPSHIPPING DATA FOUNDATION (NOT ENABLED AT CHECKOUT)
+-- Planning milestone only: no authenticated client writes, no public views,
+-- no checkout integration, no COD, and no courier automation in this release.
+-- All tables are private and service-role-only until trusted RPCs and policies
+-- have been independently reviewed and tested.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.supplier_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  seller_shop_id UUID NOT NULL UNIQUE REFERENCES public.seller_shops(id) ON DELETE RESTRICT,
+  approval_status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (approval_status IN ('pending', 'approved', 'rejected', 'suspended')),
+  business_name TEXT NOT NULL,
+  dispatch_contact_name TEXT,
+  dispatch_phone TEXT,
+  dispatch_address TEXT,
+  dispatch_city TEXT,
+  dispatch_state TEXT,
+  dispatch_pincode TEXT,
+  approved_by UUID,
+  approved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (
+    (approval_status = 'approved' AND approved_at IS NOT NULL AND approved_by IS NOT NULL)
+    OR approval_status <> 'approved'
+  )
+);
+
+CREATE TABLE IF NOT EXISTS public.supplier_stock (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  supplier_id UUID NOT NULL REFERENCES public.supplier_profiles(id) ON DELETE RESTRICT,
+  supplier_sku TEXT,
+  product_name TEXT NOT NULL,
+  description TEXT,
+  category TEXT NOT NULL,
+  image_url TEXT,
+  available_quantity INTEGER NOT NULL DEFAULT 0 CHECK (available_quantity >= 0),
+  currency TEXT NOT NULL DEFAULT 'INR' CHECK (currency = 'INR'),
+  active BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (supplier_id, supplier_sku)
+);
+
+CREATE TABLE IF NOT EXISTS public.supplier_offers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  supplier_id UUID NOT NULL REFERENCES public.supplier_profiles(id) ON DELETE RESTRICT,
+  supplier_stock_id UUID NOT NULL REFERENCES public.supplier_stock(id) ON DELETE RESTRICT,
+  wholesale_price_inr NUMERIC(12,2) NOT NULL CHECK (wholesale_price_inr > 0),
+  minimum_order_quantity INTEGER NOT NULL DEFAULT 1 CHECK (minimum_order_quantity > 0),
+  direct_to_customer_dispatch BOOLEAN NOT NULL DEFAULT TRUE,
+  offer_status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (offer_status IN ('pending', 'active', 'paused', 'rejected', 'retired')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (wholesale_price_inr = round(wholesale_price_inr, 2))
+);
+
+CREATE TABLE IF NOT EXISTS public.reseller_listings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  reseller_shop_id UUID NOT NULL REFERENCES public.seller_shops(id) ON DELETE RESTRICT,
+  supplier_offer_id UUID NOT NULL REFERENCES public.supplier_offers(id) ON DELETE RESTRICT,
+  retail_price_inr NUMERIC(12,2) NOT NULL CHECK (retail_price_inr > 0),
+  listing_status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (listing_status IN ('pending', 'active', 'paused', 'rejected', 'retired')),
+  public_title TEXT,
+  public_description TEXT,
+  public_image_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (reseller_shop_id, supplier_offer_id),
+  CHECK (retail_price_inr = round(retail_price_inr, 2))
+);
+
+CREATE TABLE IF NOT EXISTS public.supplier_order_allocations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_item_id UUID NOT NULL UNIQUE REFERENCES public.order_items(id) ON DELETE RESTRICT,
+  supplier_id UUID NOT NULL REFERENCES public.supplier_profiles(id) ON DELETE RESTRICT,
+  supplier_offer_id UUID NOT NULL REFERENCES public.supplier_offers(id) ON DELETE RESTRICT,
+  reseller_shop_id UUID REFERENCES public.seller_shops(id) ON DELETE RESTRICT,
+  fulfilment_mode TEXT NOT NULL CHECK (fulfilment_mode IN ('supplier_direct', 'supplier_dropship')),
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  supplier_unit_cost_inr NUMERIC(12,2) NOT NULL CHECK (supplier_unit_cost_inr > 0),
+  customer_unit_price_inr NUMERIC(12,2) NOT NULL CHECK (customer_unit_price_inr > 0),
+  platform_fee_rate NUMERIC(5,2) NOT NULL CHECK (platform_fee_rate >= 0 AND platform_fee_rate <= 100),
+  platform_fee_amount_inr NUMERIC(12,2) NOT NULL CHECK (platform_fee_amount_inr >= 0),
+  supplier_payable_inr NUMERIC(12,2) NOT NULL CHECK (supplier_payable_inr >= 0),
+  reseller_gross_margin_inr NUMERIC(12,2) NOT NULL CHECK (reseller_gross_margin_inr >= 0),
+  payment_method TEXT NOT NULL DEFAULT 'cod' CHECK (payment_method IN ('upi', 'card')),
+  allocation_status TEXT NOT NULL DEFAULT 'awaiting_supplier'
+    CHECK (allocation_status IN ('awaiting_supplier', 'accepted', 'rejected', 'dispatch_pending', 'shipped', 'delivered', 'cancelled', 'return_pending', 'returned', 'disputed')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CHECK (supplier_unit_cost_inr = round(supplier_unit_cost_inr, 2)),
+  CHECK (customer_unit_price_inr = round(customer_unit_price_inr, 2)),
+  CHECK (platform_fee_amount_inr = round(platform_fee_amount_inr, 2)),
+  CHECK (supplier_payable_inr = round(supplier_payable_inr, 2)),
+  CHECK (reseller_gross_margin_inr = round(reseller_gross_margin_inr, 2))
+);
+
+CREATE TABLE IF NOT EXISTS public.supplier_fulfilment_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  allocation_id UUID NOT NULL REFERENCES public.supplier_order_allocations(id) ON DELETE RESTRICT,
+  event_type TEXT NOT NULL
+    CHECK (event_type IN ('supplier_accepted', 'supplier_rejected', 'packed', 'dispatch_booked', 'shipped', 'in_transit', 'out_for_delivery', 'delivered', 'delivery_failed', 'return_started', 'returned', 'cancelled', 'manual_note')),
+  courier_provider TEXT,
+  tracking_reference TEXT,
+  event_note TEXT,
+  provider_event_id TEXT,
+  event_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  recorded_by UUID,
+  occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (courier_provider, provider_event_id)
+);
+
+CREATE INDEX IF NOT EXISTS supplier_stock_supplier_active_idx
+  ON public.supplier_stock (supplier_id, active);
+CREATE INDEX IF NOT EXISTS supplier_offers_supplier_status_idx
+  ON public.supplier_offers (supplier_id, offer_status);
+CREATE INDEX IF NOT EXISTS reseller_listings_reseller_status_idx
+  ON public.reseller_listings (reseller_shop_id, listing_status);
+CREATE INDEX IF NOT EXISTS supplier_allocations_supplier_status_idx
+  ON public.supplier_order_allocations (supplier_id, allocation_status);
+CREATE INDEX IF NOT EXISTS supplier_fulfilment_events_allocation_time_idx
+  ON public.supplier_fulfilment_events (allocation_id, occurred_at DESC);
+
+ALTER TABLE public.supplier_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.supplier_stock ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.supplier_offers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.reseller_listings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.supplier_order_allocations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.supplier_fulfilment_events ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE
+  public.supplier_profiles,
+  public.supplier_stock,
+  public.supplier_offers,
+  public.reseller_listings,
+  public.supplier_order_allocations,
+  public.supplier_fulfilment_events
+FROM PUBLIC, anon, authenticated;
+
+GRANT ALL ON TABLE
+  public.supplier_profiles,
+  public.supplier_stock,
+  public.supplier_offers,
+  public.reseller_listings,
+  public.supplier_order_allocations,
+  public.supplier_fulfilment_events
+TO service_role;
+
+COMMENT ON TABLE public.supplier_profiles IS
+  'Private supplier capability and dispatch identity. Approval must be explicit; no client table access is enabled.';
+COMMENT ON TABLE public.supplier_stock IS
+  'Private supplier-owned inventory. Quantity is not public catalogue stock.';
+COMMENT ON TABLE public.supplier_offers IS
+  'Private supplier commercial offers. Wholesale price must never be exposed to customers or unrelated sellers.';
+COMMENT ON TABLE public.reseller_listings IS
+  'Private reseller-to-offer relationship. Public catalogue projection is not implemented.';
+COMMENT ON TABLE public.supplier_order_allocations IS
+  'Private immutable-intent financial and fulfilment snapshot. Trusted checkout RPC is not implemented; COD is excluded.';
+COMMENT ON TABLE public.supplier_fulfilment_events IS
+  'Private supplier fulfilment event ledger. Courier integration and signed webhooks are not implemented.';
+
 COMMIT;
