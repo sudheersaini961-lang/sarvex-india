@@ -3604,7 +3604,7 @@ BEGIN
 
   RETURN jsonb_build_object('supplier_id', v_supplier_id, 'approval_status', 'pending');
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.supplier_save_stock(
   p_stock_id UUID,
@@ -3633,7 +3633,7 @@ BEGIN
      OR p_available_quantity > 1000000
      OR (p_supplier_sku IS NOT NULL AND length(trim(p_supplier_sku)) > 80)
      OR (p_description IS NOT NULL AND length(p_description) > 5000)
-     OR (p_image_url IS NOT NULL AND p_image_url !~ '^https://[^[:space:]]+$
+     OR (p_image_url IS NOT NULL AND p_image_url !~ '^https://[^[:space:]]+$'
 ) THEN
     RAISE EXCEPTION 'Supplier stock details are invalid';
   END IF;
@@ -3672,7 +3672,7 @@ BEGIN
 
   RETURN jsonb_build_object('stock_id', v_stock_id, 'saved', true);
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.supplier_create_offer(
   p_supplier_stock_id UUID,
@@ -3718,7 +3718,7 @@ BEGIN
 
   RETURN jsonb_build_object('offer_id', v_offer_id, 'offer_status', 'pending');
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.reseller_create_listing(
   p_supplier_offer_id UUID,
@@ -3744,7 +3744,7 @@ BEGIN
      OR p_retail_price_inr <> round(p_retail_price_inr, 2)
      OR length(trim(COALESCE(p_public_title, ''))) NOT BETWEEN 2 AND 180
      OR (p_public_description IS NOT NULL AND length(p_public_description) > 5000)
-     OR (p_public_image_url IS NOT NULL AND p_public_image_url !~ '^https://[^[:space:]]+$
+     OR (p_public_image_url IS NOT NULL AND p_public_image_url !~ '^https://[^[:space:]]+$'
 ) THEN
     RAISE EXCEPTION 'Reseller listing details are invalid';
   END IF;
@@ -3779,7 +3779,7 @@ BEGIN
 
   RETURN jsonb_build_object('listing_id', v_listing_id, 'listing_status', 'pending');
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.admin_review_supplier(
   p_supplier_id UUID,
@@ -3806,7 +3806,7 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'Supplier application not found'; END IF;
   RETURN jsonb_build_object('supplier_id', p_supplier_id, 'approval_status', p_approval_status);
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.admin_review_supplier_offer(
   p_offer_id UUID,
@@ -3837,7 +3837,7 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'Offer not found or supplier/stock is not eligible'; END IF;
   RETURN jsonb_build_object('offer_id', p_offer_id, 'offer_status', p_offer_status);
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.admin_review_reseller_listing(
   p_listing_id UUID,
@@ -3870,7 +3870,7 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'Reseller listing not found or source offer is not eligible'; END IF;
   RETURN jsonb_build_object('listing_id', p_listing_id, 'listing_status', p_listing_status);
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.get_my_supplier_workspace()
 RETURNS JSONB
@@ -3929,7 +3929,7 @@ BEGIN
     'reseller_listings', v_reseller_listings
   );
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.supplier_apply(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,TEXT) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.supplier_save_stock(UUID,TEXT,TEXT,TEXT,TEXT,TEXT,INTEGER,BOOLEAN) FROM PUBLIC, anon;
@@ -3996,7 +3996,7 @@ BEGIN
 
   RETURN v_rows;
 END;
-$;
+$$;
 
 CREATE OR REPLACE FUNCTION public.admin_list_supplier_review_queue()
 RETURNS JSONB
@@ -4040,7 +4040,7 @@ BEGIN
 
   RETURN jsonb_build_object('suppliers', v_suppliers, 'offers', v_offers, 'listings', v_listings);
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.browse_supplier_offers() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.admin_list_supplier_review_queue() FROM PUBLIC, anon;
