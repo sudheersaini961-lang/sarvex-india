@@ -129,6 +129,45 @@ BEGIN
     RAISE EXCEPTION 'Authenticated users must not read supplier wholesale or payout snapshots';
   END IF;
 
+
+  -- Supplier/reseller RPC surface: authenticated-only, no anonymous execution.
+  IF to_regprocedure('public.supplier_apply(text,text,text,text,text,text,text)') IS NULL
+     OR to_regprocedure('public.supplier_save_stock(uuid,text,text,text,text,text,integer,boolean)') IS NULL
+     OR to_regprocedure('public.supplier_create_offer(uuid,numeric,integer,boolean)') IS NULL
+     OR to_regprocedure('public.reseller_create_listing(uuid,numeric,text,text,text)') IS NULL
+     OR to_regprocedure('public.admin_review_supplier(uuid,text)') IS NULL
+     OR to_regprocedure('public.admin_review_supplier_offer(uuid,text)') IS NULL
+     OR to_regprocedure('public.admin_review_reseller_listing(uuid,text)') IS NULL
+     OR to_regprocedure('public.get_my_supplier_workspace()') IS NULL THEN
+    RAISE EXCEPTION 'One or more supplier/reseller workspace RPCs are missing';
+  END IF;
+
+  IF has_function_privilege('anon', 'public.supplier_apply(text,text,text,text,text,text,text)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.supplier_save_stock(uuid,text,text,text,text,text,integer,boolean)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.supplier_create_offer(uuid,numeric,integer,boolean)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.reseller_create_listing(uuid,numeric,text,text,text)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.admin_review_supplier(uuid,text)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.admin_review_supplier_offer(uuid,text)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.admin_review_reseller_listing(uuid,text)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.get_my_supplier_workspace()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Anonymous role can execute a private supplier/reseller RPC';
+  END IF;
+
+  IF NOT has_function_privilege('authenticated', 'public.supplier_apply(text,text,text,text,text,text,text)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.supplier_save_stock(uuid,text,text,text,text,text,integer,boolean)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.supplier_create_offer(uuid,numeric,integer,boolean)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.reseller_create_listing(uuid,numeric,text,text,text)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.admin_review_supplier(uuid,text)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.admin_review_supplier_offer(uuid,text)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.admin_review_reseller_listing(uuid,text)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', 'public.get_my_supplier_workspace()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Authenticated role is missing an intended supplier/reseller RPC grant';
+  END IF;
+
+  IF has_function_privilege('anon', 'public.place_sarvex_order(text,text,text,text,text,text,text,jsonb,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Anonymous role can execute checkout';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM storage.buckets
     WHERE id = 'product-images' AND public = true
