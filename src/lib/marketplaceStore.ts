@@ -1063,6 +1063,20 @@ export function useMarketplace() {
     if (!supabase || !ownerId || !isUuid(ownerId)) {
       throw new Error('Please connect Supabase and sign in before registering a seller account.');
     }
+    // Fail closed if this account already has a shop/application or ownership lookup fails.
+    // The query is scoped to the authenticated owner; it never exposes another seller's private row.
+    const { data: existingShops, error: existingShopsError } = await supabase
+      .from('seller_shops')
+      .select('id')
+      .eq('owner_id', ownerId)
+      .limit(1);
+    if (existingShopsError) {
+      throw new Error(`Existing seller application could not be checked: ${existingShopsError.message}`);
+    }
+    if (existingShops && existingShops.length > 0) {
+      throw new Error('A seller shop/application already exists for this account. Open Seller Hub or contact SARVEX support instead of submitting a duplicate.');
+    }
+
     const shopUuid = generateUuid();
     const newSeller: Seller = {
       ...sellerData,
@@ -1150,9 +1164,21 @@ export function useMarketplace() {
       productData.mrp < productData.price ||
       productData.stock < 0 ||
       !productData.title.trim() ||
-      !productData.category.trim()
+      !productData.category.trim() ||
+      typeof productData.imageUrl !== 'string' ||
+      !productData.imageUrl.trim()
     ) {
-      throw new Error('Check product title, category, price, MRP and whole-number stock values.');
+      throw new Error('Check product title, category, price, MRP, image URL and whole-number stock values.');
+    }
+
+    let parsedImageUrl: URL;
+    try {
+      parsedImageUrl = new URL(productData.imageUrl);
+    } catch {
+      throw new Error('Enter a valid HTTPS product image URL.');
+    }
+    if (parsedImageUrl.protocol !== 'https:') {
+      throw new Error('Product images must use HTTPS.');
     }
 
     const productUuid = generateUuid();
@@ -1175,6 +1201,7 @@ export function useMarketplace() {
       image_url: newProduct.imageUrl,
       description: newProduct.description,
       price_inr: newProduct.price,
+      mrp: newProduct.mrp,
       discount_percent: discount,
       rating: 0,
       rating_count: 0,
