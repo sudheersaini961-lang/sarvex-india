@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ShieldCheck,
   Users,
@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useMarketplace } from '../lib/marketplaceStore';
 import { OrderStatus, Order } from '../types/marketplace';
-import { getStoredSupabaseConfig } from '../lib/supabaseClient';
+import { getStoredSupabaseConfig, getSupabase } from '../lib/supabaseClient';
 import { DatabaseSettingsCard } from './DatabaseSettingsCard';
 
 interface AdminDashboardProps {
@@ -34,10 +34,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     approveSeller,
     rejectSeller,
     updateOrderStatus,
+    currentUser,
   } = useMarketplace();
 
   const [orderFilter, setOrderFilter] = useState<OrderStatus | 'all'>('all');
   const [actionError, setActionError] = useState('');
+  const [supplierQueue, setSupplierQueue] = useState<any>({ suppliers: [], offers: [], listings: [] });
+  const [supplierQueueError, setSupplierQueueError] = useState('');
+  const [supplierQueueLoading, setSupplierQueueLoading] = useState(false);
   const runAdminAction = async (action: () => Promise<void>) => {
     setActionError('');
     try {
@@ -46,6 +50,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setActionError(error instanceof Error ? error.message : 'Admin action could not be completed.');
     }
   };
+  const refreshSupplierQueue = async () => {
+    const supabase = getSupabase();
+    if (!supabase) {
+      setSupplierQueueError('Supabase database configure nahi hai.');
+      return;
+    }
+    setSupplierQueueLoading(true);
+    const { data, error } = await supabase.rpc('admin_list_supplier_review_queue');
+    if (error) setSupplierQueueError(error.message);
+    else {
+      setSupplierQueue(data || { suppliers: [], offers: [], listings: [] });
+      setSupplierQueueError('');
+    }
+    setSupplierQueueLoading(false);
+  };
+
+  useEffect(() => {
+    if (currentUser?.id) void refreshSupplierQueue();
+  }, [currentUser?.id]);
+
+  const reviewSupplierItem = async (rpcName: string, id: string, status: string) => {
+    const supabase = getSupabase();
+    if (!supabase) throw new Error('Supabase database configure nahi hai.');
+    const idParam = rpcName === 'admin_review_supplier' ? 'p_supplier_id'
+      : rpcName === 'admin_review_supplier_offer' ? 'p_offer_id' : 'p_listing_id';
+    const { error } = await supabase.rpc(rpcName, { [idParam]: id, [rpcName === 'admin_review_supplier' ? 'p_approval_status' : rpcName === 'admin_review_supplier_offer' ? 'p_offer_status' : 'p_listing_status']: status });
+    if (error) throw error;
+    await refreshSupplierQueue();
+  };
+
   const { isConfigured: isSupabaseConnected, url: supabaseUrl } = getStoredSupabaseConfig();
 
   const pendingSellers = sellers.filter((s) => s.status === 'pending');
@@ -178,6 +212,50 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+
+      {/* Supplier, wholesale offer and reseller listing review */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-900">Supplier & Dropship Review Queue</h3>
+          <button onClick={() => void refreshSupplierQueue()} className="flex items-center gap-1 text-[11px] font-bold text-[#1e3a8a]"><RefreshCw size={13}/> Refresh</button>
+        </div>
+        {supplierQueueError && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-800">{supplierQueueError}</p>}
+        {supplierQueueLoading && <p className="text-xs text-gray-500">Review queue loading…</p>}
+        {!supplierQueueLoading && !supplierQueueError && (
+          <>
+            <div className="space-y-2">
+              <p className="text-xs font-bold">Supplier applications ({supplierQueue.suppliers?.length || 0})</p>
+              {(supplierQueue.suppliers || []).map((item:any) => <div key={item.id} className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-1">
+                <p className="text-xs font-bold">{item.business_name}</p>
+                <p className="text-[11px] text-gray-700">{item.dispatch_contact_name} · {item.dispatch_phone}</p>
+                <p className="text-[11px] text-gray-600">{item.dispatch_address}, {item.dispatch_city}, {item.dispatch_state} {item.dispatch_pincode}</p>
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => void runAdminAction(() => reviewSupplierItem('admin_review_supplier', item.id, 'approved'))} className="flex-1 rounded-lg bg-emerald-600 p-2 text-[11px] font-bold text-white">Approve Supplier</button>
+                  <button onClick={() => void runAdminAction(() => reviewSupplierItem('admin_review_supplier', item.id, 'rejected'))} className="rounded-lg bg-red-100 px-3 text-[11px] font-bold text-red-700">Reject</button>
+                </div>
+              </div>)}
+              {(!supplierQueue.suppliers || supplierQueue.suppliers.length===0) && <p className="text-[11px] text-gray-500">No pending supplier applications.</p>}
+            </div>
+            <div className="space-y-2 border-t pt-3">
+              <p className="text-xs font-bold">Wholesale offers ({supplierQueue.offers?.length || 0})</p>
+              {(supplierQueue.offers || []).map((item:any) => <div key={item.id} className="flex items-center justify-between gap-2 rounded-lg border p-2">
+                <div className="min-w-0"><p className="text-xs font-semibold">{item.product_name}</p><p className="text-[11px] text-gray-500">Wholesale ₹{Number(item.wholesale_price_inr).toLocaleString('en-IN')} · MOQ {item.minimum_order_quantity}</p></div>
+                <div className="flex gap-1"><button onClick={() => void runAdminAction(() => reviewSupplierItem('admin_review_supplier_offer', item.id, 'active'))} className="rounded bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white">Approve</button><button onClick={() => void runAdminAction(() => reviewSupplierItem('admin_review_supplier_offer', item.id, 'rejected'))} className="rounded bg-red-100 px-2 py-1 text-[10px] font-bold text-red-700">Reject</button></div>
+              </div>)}
+              {(!supplierQueue.offers || supplierQueue.offers.length===0) && <p className="text-[11px] text-gray-500">No pending wholesale offers.</p>}
+            </div>
+            <div className="space-y-2 border-t pt-3">
+              <p className="text-xs font-bold">Reseller listings ({supplierQueue.listings?.length || 0})</p>
+              {(supplierQueue.listings || []).map((item:any) => <div key={item.id} className="flex items-center justify-between gap-2 rounded-lg border p-2">
+                <div className="min-w-0"><p className="text-xs font-semibold">{item.public_title}</p><p className="text-[11px] text-gray-500">Retail ₹{Number(item.retail_price_inr).toLocaleString('en-IN')}</p></div>
+                <div className="flex gap-1"><button onClick={() => void runAdminAction(() => reviewSupplierItem('admin_review_reseller_listing', item.id, 'active'))} className="rounded bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white">Approve</button><button onClick={() => void runAdminAction(() => reviewSupplierItem('admin_review_reseller_listing', item.id, 'rejected'))} className="rounded bg-red-100 px-2 py-1 text-[10px] font-bold text-red-700">Reject</button></div>
+              </div>)}
+              {(!supplierQueue.listings || supplierQueue.listings.length===0) && <p className="text-[11px] text-gray-500">No pending reseller listings.</p>}
+            </div>
+          </>
         )}
       </div>
 
