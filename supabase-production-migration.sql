@@ -97,7 +97,7 @@ BEGIN
 
     -- order_items
     ('public', 'order_items', 'View order items', 'SELECT', 'public', 'PERMISSIVE',
-     '^[\s\(\)]*\(?\(?\(?(auth\.)?uid\(\)\s+is\s+not\s+null\s*and\s*\(?(public\.)?is_order_customer\(\s*order_id\s*\)\)?\)?\s*or\s*\(?(public\.)?is_seller_shop_owner\(\s*seller_shop_id\s*\)\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$', NULL),
+     '^[\s\(\)]*\(?\(?\(?(auth\.)?uid\(\)\s+is\s+not\s+null\)?\s+and\s*\(?(public\.)?is_order_customer\(\s*order_id\s*\)\)?\)?\s*or\s*\(?(public\.)?is_seller_shop_owner\(\s*seller_shop_id\s*\)\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$', NULL),
     ('public', 'order_items', 'Only admins or trusted procedures insert order items', 'INSERT', 'public', 'PERMISSIVE',
      NULL, '^[\s\(\)]*\(?(public\.)?is_sarvex_admin\(\)\)?[\s\(\)]*$'),
     ('public', 'order_items', 'Customers insert order items for their own orders', 'INSERT', 'public', 'PERMISSIVE',
