@@ -7,7 +7,6 @@ on:
       - fix/public-seller-sync-security
     paths:
       - "supabase-production-migration.sql"
-      - "supabase/config.toml"
       - "supabase/tests/**"
       - ".github/workflows/postgres-runtime.yml"
 
@@ -20,64 +19,78 @@ concurrency:
 
 jobs:
   migration-runtime:
-    name: Supabase local stack / PostgreSQL ${{ matrix.pg }}
+    name: PostgreSQL ${{ matrix.pg }} migration runtime
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         pg: ["15", "16"]
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Select PostgreSQL major version
-        shell: bash
-        run: |
-          sed -i 's/^major_version = .*/major_version = ${{ matrix.pg }}/' supabase/config.toml
-          grep -q "^major_version = ${{ matrix.pg }}$" supabase/config.toml
-
-      - name: Start isolated local Supabase stack
-        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,mailpit
 
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update
           sudo apt-get install -y postgresql-client
 
+      - name: Bootstrap isolated Supabase auth and storage interfaces
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap-supabase.sql
+
       - name: Apply production migration (first run)
-        shell: bash
-        run: |
-          set -euo pipefail
-          eval "$(supabase status -o env)"
-          test -n "${DB_URL:-}"
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
+        run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
 
       - name: Verify migration runtime invariants
-        shell: bash
-        run: |
-          set -euo pipefail
-          eval "$(supabase status -o env)"
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
 
       - name: Apply migration again (idempotency check)
-        shell: bash
-        run: |
-          set -euo pipefail
-          eval "$(supabase status -o env)"
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
+        run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
 
       - name: Verify idempotent re-application
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
+
+  live-supabase-readonly:
+    name: Optional live Supabase REST connectivity check
+    runs-on: ubuntu-latest
+    if: ${{ vars.VITE_SUPABASE_URL != '' && vars.VITE_SUPABASE_ANON_KEY != '' }}
+    steps:
+      - name: Check configured Supabase products endpoint (read-only)
+        env:
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
         shell: bash
         run: |
           set -euo pipefail
-          eval "$(supabase status -o env)"
-          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
-
-      - name: Stop local Supabase stack
-        if: always()
-        run: supabase stop --no-backup
+          case "$SUPABASE_URL" in
+            https://*) ;;
+            *) echo "Supabase URL must use HTTPS"; exit 1 ;;
+          esac
+          code=$(curl --silent --show-error --output /tmp/sarvex-products.json --write-out "%{http_code}" \
+            --header "apikey: $SUPABASE_ANON_KEY" \
+            --header "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/products?select=id&limit=1")
+          if [ "$code" != "200" ]; then
+            echo "Supabase REST read failed with HTTP $code"
+            exit 1
+          fi
+          jq -e 'type == "array"' /tmp/sarvex-products.json >/dev/null
+          echo "Supabase REST connectivity PASS (read-only products endpoint; no rows or secrets printed)."
