@@ -3996,6 +3996,7 @@ BEGIN
   JOIN public.seller_shops ss ON ss.id = sp.seller_shop_id
   JOIN public.supplier_stock st ON st.id = so.supplier_stock_id AND st.supplier_id = sp.id
   WHERE so.offer_status = 'active'
+    AND so.direct_to_customer_dispatch = true
     AND sp.approval_status = 'approved'
     AND ss.approval_status = 'approved'
     AND st.active = true
