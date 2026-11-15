@@ -44,7 +44,7 @@ BEGIN
     ('public', 'customer_profiles', 'Users view own profile or admin', 'SELECT', 'public', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s*=\s*owner_id\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$', NULL),
     ('public', 'customer_profiles', 'Users can create their own profile', 'INSERT', 'public', 'PERMISSIVE',
-     NULL, '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s*=\s*owner_id\)?\s*and\s*\(?\(?account_role\s+is\s+null\s*or\s*account_role\s*=\s*''customer''(::text)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?\)?\)?[\s\(\)]*$'),
+     NULL, '^[\s\(\)]*.*(auth\.)?uid\(\)\s*=\s*owner_id.*account_role\s+is\s+null.*account_role\s*=\s*''customer''(::text)?.*(public\.)?is_sarvex_admin\(\).*[\s\(\)]*$'),
     ('public', 'customer_profiles', 'Users can update their own profile details', 'UPDATE', 'public', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s*=\s*owner_id\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$',
      '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s*=\s*owner_id\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$'),
