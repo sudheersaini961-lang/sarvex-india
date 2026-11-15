@@ -2,7 +2,7 @@
 
 ## Status
 
-Planning only. This document does not enable dropshipping, change the database, create supplier accounts, or alter checkout. The current marketplace supports seller-owned products and seller-managed dispatch; supplier fulfilment is not implemented.
+Foundation implemented on the working branch only. The repository now contains private supplier/stock/offer/reseller/allocation/event tables, authenticated supplier/reseller RPCs, a seller-side supplier workspace, and an admin review queue. This is not a live deployment and does not enable customer dropship checkout, public reseller listings, supplier order allocation, COD, or courier automation.
 
 ## Business roles
 
@@ -77,7 +77,7 @@ Extend the existing strict policy-verification and smoke-test framework delibera
 
 ## Current limitations
 
-The repository currently has a single seller-shop model, seller-owned products, and seller order fulfilment. It does not yet model suppliers, wholesale offers, reseller listings, supplier allocations, supplier dispatch events, automated payment splitting, or COD remittance. This design is not a claim that any of those capabilities are live.
+The existing customer checkout still supports only seller-owned products and the current COD order RPC. The supplier foundation now models supplier profiles, private stock, wholesale offers, reseller listings, supplier order allocations, and fulfilment event records. Authenticated RPCs support supplier application, supplier stock entry, offer submission, reseller listing submission, admin approval, and scoped workspace/discovery reads. The Seller Portal has supplier/reseller forms and the Admin Dashboard has review queues. These records remain private and are not joined into the customer catalogue or checkout. No supplier order allocation is created at purchase time; no customer-facing dropship order, supplier acceptance workflow, payment split, courier booking, live tracking, COD remittance, or returns automation is implemented.
 
 ## External marketplace links and delivery automation
 
@@ -135,7 +135,11 @@ Reviewed the current root migration, checkout RPC, seller order view, smoke asse
 ### Review status
 
 - Existing seller checkout source mapping: REVIEWED.
-- Dropshipping schema and RPC implementation: NOT IMPLEMENTED.
-- Supplier/reseller UI and product-link import: NOT IMPLEMENTED.
-- Courier booking and live tracking: NOT IMPLEMENTED.
+- Private supplier/reseller schema: IMPLEMENTED on the working branch; no live Supabase migration applied.
+- Supplier/reseller authenticated RPCs and role checks: IMPLEMENTED; isolated PostgreSQL 15/16 migration + smoke + idempotency workflow PASS at commit 8177ee5.
+- Seller Portal supplier application, stock, offer and reseller listing forms: IMPLEMENTED; TypeScript and production web build PASS at commit 3753971.
+- Admin supplier/offer/listing review queue: IMPLEMENTED; TypeScript and production web build PASS at commit 3753971.
+- Customer-facing dropship catalogue and checkout/order allocation: NOT IMPLEMENTED; intentionally disabled.
+- Supplier accept/reject, dispatch proof, shipment tracking, courier API and COD reconciliation: NOT IMPLEMENTED.
+- Flipkart/Meesho product-link import: NOT IMPLEMENTED; requires authorised API/feed or supplier permission.
 - Live Supabase verification and physical Android verification: NOT VERIFIED.
