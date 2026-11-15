@@ -22,6 +22,40 @@ export function generateUuid(): string {
   throw new Error('Secure random number generation is unavailable. Use a supported HTTPS browser.');
 }
 
+// Accept only Supabase project hosts, never lookalike domains or arbitrary HTTPS URLs.
+export function isValidSupabaseProjectUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' &&
+      parsed.hostname.endsWith('.supabase.co') &&
+      parsed.hostname.length > '.supabase.co'.length &&
+      parsed.username === '' &&
+      parsed.password === '' &&
+      parsed.port === '';
+  } catch {
+    return false;
+  }
+}
+
+// Supabase publishable keys are safe by prefix. Legacy anon keys are JWTs
+// whose decoded role must be exactly "anon"; secret/service-role JWTs fail closed.
+export function isSafeSupabaseAnonKey(value: string): boolean {
+  const key = value.trim();
+  if (key.startsWith('sb_publishable_')) return key.length > 'sb_publishable_'.length;
+  if (key.startsWith('sb_secret_')) return false;
+
+  const parts = key.split('.');
+  if (parts.length !== 3) return false;
+  try {
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = atob(payload.padEnd(Math.ceil(payload.length / 4) * 4, '='));
+    const claims = JSON.parse(decoded) as { role?: unknown };
+    return claims.role === 'anon';
+  } catch {
+    return false;
+  }
+}
+
 // Get credentials from Vite env or user runtime settings
 export function getStoredSupabaseConfig() {
   const envUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -32,14 +66,7 @@ export function getStoredSupabaseConfig() {
 
   const url = (localUrl || envUrl || '').trim();
   const key = (localKey || envKey || '').trim();
-
-  const isConfigured = Boolean(
-    url &&
-    key &&
-    url.startsWith('https://') &&
-    url.includes('.supabase.co') &&
-    key.length > 20
-  );
+  const isConfigured = isValidSupabaseProjectUrl(url) && isSafeSupabaseAnonKey(key);
 
   return { url, key, isConfigured };
 }
@@ -93,15 +120,14 @@ export async function testSupabaseConnection(url?: string, key?: string): Promis
     return { success: false, message: 'Please provide both Supabase Project URL and Anon Public Key.' };
   }
 
-  // Prevent service_role key usage for security
-  if (targetKey.toLowerCase().includes('service_role')) {
+  if (!isSafeSupabaseAnonKey(targetKey)) {
     return {
       success: false,
-      message: 'Security Alert: Do NOT use the service_role secret key in a client browser! Use the safe "anon" public key from Supabase Project Settings → API.'
+      message: 'Unsafe or unsupported API key. Use a Supabase publishable key or legacy anon JWT key only. Never use a secret/service_role key.'
     };
   }
 
-  if (!targetUrl.startsWith('https://') || !targetUrl.includes('.supabase.co')) {
+  if (!isValidSupabaseProjectUrl(targetUrl)) {
     return {
       success: false,
       message: 'Invalid URL. Project URL must start with https:// and end with .supabase.co'
