@@ -53,7 +53,7 @@ BEGIN
     ('public', 'seller_shops', 'Sellers and Admins view seller shops', 'SELECT', 'public', 'PERMISSIVE',
      '^[\s\(\)]*.*(auth\.)?uid\(\).*owner_id\s*=\s*(auth\.)?uid\(\).*is_sarvex_admin\(\).*[\s\(\)]*$', NULL),
     ('public', 'seller_shops', 'Authenticated users can register a shop', 'INSERT', 'public', 'PERMISSIVE',
-     NULL, '^[\s\(\)]*\(?\(?approval_status\s*=\s*''pending''(::text)?\s*and\s*\(?(auth\.)?uid\(\)\s*=\s*owner_id\)?\)?\)?[\s\(\)]*$'),
+     NULL, '^[\s\(\)]*\(?\(?approval_status\s*=\s*''pending''(::text)?\)?\s+and\s+\(?\(?\(?(auth\.)?uid\(\)\)?\s*=\s*owner_id\)?\)?\)?[\s\(\)]*$'),
     ('public', 'seller_shops', 'Sellers can update their own shop details', 'UPDATE', 'public', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?owner_id\s*=\s*(auth\.)?uid\(\)\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$',
      '^[\s\(\)]*\(?\(?owner_id\s*=\s*(auth\.)?uid\(\)\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$'),
