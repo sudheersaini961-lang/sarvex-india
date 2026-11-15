@@ -2826,15 +2826,13 @@ REVOKE ALL ON FUNCTION public.has_verified_purchase(UUID, UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.has_verified_purchase(UUID, UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.has_verified_purchase(UUID, UUID) TO service_role;
 
-REVOKE ALL ON FUNCTION public.order_has_seller_item(UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.order_has_seller_item(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.order_has_seller_item(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.order_has_seller_item(UUID) TO service_role;
-GRANT EXECUTE ON FUNCTION public.order_has_seller_item(UUID) TO anon;
 
-REVOKE ALL ON FUNCTION public.is_order_customer(UUID) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.is_order_customer(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.is_order_customer(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_order_customer(UUID) TO service_role;
-GRANT EXECUTE ON FUNCTION public.is_order_customer(UUID) TO anon;
 
 -- place_sarvex_order: Strictly authenticated and service_role (NO anon execution)
 REVOKE ALL ON FUNCTION public.place_sarvex_order(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB) FROM PUBLIC;
