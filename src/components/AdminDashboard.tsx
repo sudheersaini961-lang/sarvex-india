@@ -37,6 +37,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   } = useMarketplace();
 
   const [orderFilter, setOrderFilter] = useState<OrderStatus | 'all'>('all');
+  const [actionError, setActionError] = useState('');
+  const runAdminAction = async (action: () => Promise<void>) => {
+    setActionError('');
+    try {
+      await action();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Admin action could not be completed.');
+    }
+  };
   const { isConfigured: isSupabaseConnected, url: supabaseUrl } = getStoredSupabaseConfig();
 
   const pendingSellers = sellers.filter((s) => s.status === 'pending');
@@ -89,7 +98,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="bg-blue-900/60 p-2.5 rounded-xl border border-blue-700/50">
             <span className="text-[10px] text-blue-200 uppercase font-bold block">Total Orders</span>
             <p className="text-base font-black text-white">{stats.totalOrders}</p>
-            <span className="text-[9px] text-blue-200 font-medium">Across India</span>
+            <span className="text-[9px] text-blue-200 font-medium">Recorded in this account</span>
           </div>
 
           <div className="bg-blue-900/60 p-2.5 rounded-xl border border-blue-700/50">
@@ -103,13 +112,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="bg-blue-900/60 p-2.5 rounded-xl border border-blue-700/50">
             <span className="text-[10px] text-blue-200 uppercase font-bold block">Products Live</span>
             <p className="text-base font-black text-white">{stats.activeProducts}</p>
-            <span className="text-[9px] text-emerald-300 font-medium">In 6 Categories</span>
+            <span className="text-[9px] text-emerald-300 font-medium">Current catalog</span>
           </div>
         </div>
       </div>
 
       {/* Embedded Database Settings for Administrator */}
       <DatabaseSettingsCard />
+
+      {actionError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-800">{actionError}</div>}
 
       {/* Seller Approval Queue */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 shadow-xs">
@@ -152,13 +163,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                 <div className="flex gap-2 pt-1">
                   <button
-                    onClick={() => approveSeller(seller.id)}
+                    onClick={() => void runAdminAction(() => approveSeller(seller.id))}
                     className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-xs tap-effect flex items-center justify-center gap-1"
                   >
                     <CheckCircle2 size={14} /> Approve Store
                   </button>
                   <button
-                    onClick={() => rejectSeller(seller.id)}
+                    onClick={() => void runAdminAction(() => rejectSeller(seller.id))}
                     className="py-1.5 px-3 bg-red-100 hover:bg-red-200 text-red-700 font-bold text-xs rounded-lg tap-effect flex items-center justify-center gap-1"
                   >
                     <XCircle size={14} /> Reject
@@ -235,7 +246,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     (statusOption) => (
                       <button
                         key={statusOption}
-                        onClick={() => updateOrderStatus(ord.id, statusOption)}
+                        onClick={() => void runAdminAction(() => updateOrderStatus(ord.id, statusOption))}
                         className={`text-[10px] px-2 py-0.5 rounded border ${
                           ord.status === statusOption
                             ? 'bg-blue-600 text-white font-bold border-blue-600'
