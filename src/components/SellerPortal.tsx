@@ -145,11 +145,11 @@ export const SellerPortal: React.FC = () => {
       await callSupplierRpc('supplier_apply', {
         p_business_name: supplierBusinessName.trim(),
         p_dispatch_contact_name: dispatchContactName.trim(),
-        p_dispatch_phone: dispatchPhone.replace(/\\D/g, ''),
+        p_dispatch_phone: dispatchPhone.replace(/\D/g, ''),
         p_dispatch_address: dispatchAddress.trim(),
         p_dispatch_city: dispatchCity.trim(),
         p_dispatch_state: dispatchState.trim(),
-        p_dispatch_pincode: dispatchPincode.replace(/\\D/g, '')
+        p_dispatch_pincode: dispatchPincode.replace(/\D/g, '')
       });
       setSupplierNotice('Supplier application admin review ke liye submit ho gayi hai.');
       await refreshSupplierWorkspace();
@@ -754,12 +754,12 @@ export const SellerPortal: React.FC = () => {
                 <p className="text-xs text-gray-500">Sirf approved SARVEX sellers supplier banne ke liye apply kar sakte hain. Dispatch details private rahengi.</p>
                 <input required minLength={2} maxLength={120} value={supplierBusinessName} onChange={e=>setSupplierBusinessName(e.target.value)} placeholder="Business name" className="w-full rounded-lg border p-2 text-xs" />
                 <input required minLength={2} maxLength={100} value={dispatchContactName} onChange={e=>setDispatchContactName(e.target.value)} placeholder="Dispatch contact name" className="w-full rounded-lg border p-2 text-xs" />
-                <input required inputMode="numeric" maxLength={10} pattern="[6-9][0-9]{9}" value={dispatchPhone} onChange={e=>setDispatchPhone(e.target.value.replace(/\\D/g,'').slice(0,10))} placeholder="10-digit Indian mobile" className="w-full rounded-lg border p-2 text-xs" />
+                <input required inputMode="numeric" maxLength={10} pattern="[6-9][0-9]{9}" value={dispatchPhone} onChange={e=>setDispatchPhone(e.target.value.replace(/\D/g,'').slice(0,10))} placeholder="10-digit Indian mobile" className="w-full rounded-lg border p-2 text-xs" />
                 <textarea required minLength={8} maxLength={300} value={dispatchAddress} onChange={e=>setDispatchAddress(e.target.value)} placeholder="Supplier dispatch address" className="w-full rounded-lg border p-2 text-xs" />
                 <div className="grid grid-cols-3 gap-2">
                   <input required minLength={2} value={dispatchCity} onChange={e=>setDispatchCity(e.target.value)} placeholder="City" className="min-w-0 rounded-lg border p-2 text-xs" />
                   <input required minLength={2} value={dispatchState} onChange={e=>setDispatchState(e.target.value)} placeholder="State" className="min-w-0 rounded-lg border p-2 text-xs" />
-                  <input required inputMode="numeric" maxLength={6} pattern="[1-9][0-9]{5}" value={dispatchPincode} onChange={e=>setDispatchPincode(e.target.value.replace(/\\D/g,'').slice(0,6))} placeholder="PIN" className="min-w-0 rounded-lg border p-2 text-xs" />
+                  <input required inputMode="numeric" maxLength={6} pattern="[1-9][0-9]{5}" value={dispatchPincode} onChange={e=>setDispatchPincode(e.target.value.replace(/\D/g,'').slice(0,6))} placeholder="PIN" className="min-w-0 rounded-lg border p-2 text-xs" />
                 </div>
                 <button disabled={supplierLoading} className="w-full rounded-lg bg-[#1e3a8a] p-3 text-xs font-bold text-white">Submit Supplier Application</button>
               </form>
