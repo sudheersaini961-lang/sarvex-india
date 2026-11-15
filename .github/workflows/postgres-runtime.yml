@@ -62,6 +62,9 @@ jobs:
       - name: Verify migration runtime invariants
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
 
+      - name: Verify trusted first-admin bootstrap (transaction rolled back)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/admin-bootstrap.sql
+
       - name: Apply migration again (idempotency check)
         run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
 
