@@ -57,7 +57,7 @@ RETURNS text[]
 LANGUAGE sql
 IMMUTABLE
 AS $$
-  SELECT string_to_array(name, '/')[1:array_length(string_to_array(name, '/'), 1) - 1];
+  SELECT (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1];
 $$;
 
 GRANT USAGE ON SCHEMA auth, storage TO anon, authenticated, service_role;
