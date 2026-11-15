@@ -1497,100 +1497,102 @@ $$;
 
 ALTER FUNCTION public.claim_sarvex_admin_seat() OWNER TO postgres;
 
--- A3. bootstrap_first_admin(): Atomic bootstrap of the very first platform administrator
+-- A3. bootstrap_first_admin(p_user_id): One-time trusted bootstrap of the first platform administrator.
+-- This function is called only from the Supabase SQL Editor (postgres/supabase_admin)
+-- or a trusted server using the service_role key. Never expose service_role in the app.
 DO $$
 DECLARE
     v_func_oid oid;
-    v_ret_typename text;
+    v_dep_count integer;
 BEGIN
-    SELECT p.oid, t.typname
-    INTO v_func_oid, v_ret_typename
+    SELECT p.oid INTO v_func_oid
     FROM pg_proc p
-    JOIN pg_type t ON t.oid = p.prorettype
     JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'public'
       AND p.proname = 'bootstrap_first_admin'
       AND p.pronargs = 0;
 
-    IF v_func_oid IS NOT NULL AND v_ret_typename <> 'jsonb' THEN
+    IF v_func_oid IS NOT NULL THEN
+        SELECT count(*) INTO v_dep_count
+        FROM pg_depend d
+        WHERE d.refobjid = v_func_oid
+          AND d.refclassid = 'pg_proc'::regclass
+          AND d.deptype IN ('n', 'a');
+
+        IF v_dep_count > 0 THEN
+            RAISE EXCEPTION 'Cannot replace legacy bootstrap_first_admin(): % dependent database object(s) exist', v_dep_count;
+        END IF;
+
         DROP FUNCTION public.bootstrap_first_admin();
     END IF;
 END $$;
 
-CREATE OR REPLACE FUNCTION public.bootstrap_first_admin()
+CREATE OR REPLACE FUNCTION public.bootstrap_first_admin(p_user_id UUID)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth, pg_temp
 AS $$
 DECLARE
-  v_caller_uid UUID;
-  v_caller_email TEXT;
+  v_target_email TEXT;
   v_email_confirmed TIMESTAMPTZ;
   v_existing_admin_count INTEGER;
 BEGIN
-  -- Security check: Restrict execution strictly to service_role or database superuser
-  IF (session_user NOT IN ('postgres', 'supabase_admin') AND COALESCE(current_setting('request.jwt.claim.role', true), '') != 'service_role') THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'error', 'Security Exception: bootstrap_first_admin is restricted to service_role or database administrator.',
-      'code', '42501'
-    );
+  IF session_user NOT IN ('postgres', 'supabase_admin')
+     AND COALESCE(current_setting('request.jwt.claim.role', true), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'bootstrap_first_admin is restricted to database administrators or service_role'
+      USING ERRCODE = '42501';
   END IF;
 
-  v_caller_uid := auth.uid();
-  IF v_caller_uid IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Authentication required', 'code', '42501');
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'A target auth.users UUID is required'
+      USING ERRCODE = '22004';
   END IF;
 
-  -- 1. Fetch trusted caller email and confirmed timestamp from auth.users
+  -- Read the email from Supabase Auth; never trust a caller-supplied email.
   SELECT email, email_confirmed_at
-  INTO v_caller_email, v_email_confirmed
+    INTO v_target_email, v_email_confirmed
   FROM auth.users
-  WHERE id = v_caller_uid;
+  WHERE id = p_user_id;
 
-  IF v_caller_email IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'error', 'User record missing in auth.users', 'code', '42501');
+  IF v_target_email IS NULL THEN
+    RAISE EXCEPTION 'Target user does not exist in auth.users'
+      USING ERRCODE = '22023';
   END IF;
 
   IF v_email_confirmed IS NULL THEN
-    RETURN jsonb_build_object('success', false, 'error', 'Email verification required before bootstrapping administrator', 'code', '42501');
+    RAISE EXCEPTION 'Target user email must be confirmed before admin bootstrap'
+      USING ERRCODE = '42501';
   END IF;
 
-  -- 2. Concurrency Control: Acquire EXCLUSIVE table lock on sarvex_admin_allowlist
-  -- This serializes any concurrent first-admin bootstrap attempts so only one can succeed
+  -- Acquire the lock before checking the allowlist to prevent concurrent first-admin claims.
   LOCK TABLE public.sarvex_admin_allowlist IN EXCLUSIVE MODE;
 
-  -- 3. Check if ANY administrator already exists in allowlist
   SELECT count(*) INTO v_existing_admin_count
   FROM public.sarvex_admin_allowlist;
 
   IF v_existing_admin_count > 0 THEN
-    RETURN jsonb_build_object(
-      'success', false,
-      'error', 'Platform administrator bootstrapping is permanently closed. Administrator(s) already exist.',
-      'code', '42501'
-    );
+    RAISE EXCEPTION 'First-admin bootstrap is permanently closed because an allowlist seat already exists'
+      USING ERRCODE = '42501';
   END IF;
 
-  -- 4. Insert caller into allowlist
   INSERT INTO public.sarvex_admin_allowlist (id, user_id, email, created_at)
-  VALUES (gen_random_uuid(), v_caller_uid, lower(trim(v_caller_email)), NOW());
+  VALUES (gen_random_uuid(), p_user_id, lower(trim(v_target_email)), NOW());
 
-  -- 5. Synchronize customer profile account_role
   UPDATE public.customer_profiles
   SET account_role = 'admin'
-  WHERE owner_id = v_caller_uid;
+  WHERE owner_id = p_user_id;
 
   RETURN jsonb_build_object(
     'success', true,
-    'message', 'Initial platform administrator seat claimed successfully.',
-    'email', lower(trim(v_caller_email))
+    'user_id', p_user_id,
+    'email', lower(trim(v_target_email)),
+    'message', 'Initial platform administrator seat created.'
   );
 END;
 $$;
 
-ALTER FUNCTION public.bootstrap_first_admin() OWNER TO postgres;
+ALTER FUNCTION public.bootstrap_first_admin(UUID) OWNER TO postgres;
 
 -- B. is_seller_shop_owner(check_shop_id): Server-side verified shop ownership AND approval enforcement
 CREATE OR REPLACE FUNCTION public.is_seller_shop_owner(check_shop_id UUID)
@@ -2807,8 +2809,9 @@ REVOKE ALL ON FUNCTION public.claim_sarvex_admin_seat() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.claim_sarvex_admin_seat() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_sarvex_admin_seat() TO service_role;
 
-REVOKE ALL ON FUNCTION public.bootstrap_first_admin() FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.bootstrap_first_admin() TO service_role;
+DROP FUNCTION IF EXISTS public.bootstrap_first_admin();
+REVOKE ALL ON FUNCTION public.bootstrap_first_admin(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.bootstrap_first_admin(UUID) TO service_role;
 
 REVOKE ALL ON FUNCTION public.is_seller_shop_owner(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.is_seller_shop_owner(UUID) TO authenticated;
