@@ -3466,7 +3466,7 @@ CREATE TABLE IF NOT EXISTS public.supplier_order_allocations (
   platform_fee_amount_inr NUMERIC(12,2) NOT NULL CHECK (platform_fee_amount_inr >= 0),
   supplier_payable_inr NUMERIC(12,2) NOT NULL CHECK (supplier_payable_inr >= 0),
   reseller_gross_margin_inr NUMERIC(12,2) NOT NULL CHECK (reseller_gross_margin_inr >= 0),
-  payment_method TEXT NOT NULL DEFAULT 'cod' CHECK (payment_method IN ('upi', 'card')),
+  payment_method TEXT NOT NULL CHECK (payment_method IN ('upi', 'card')),
   allocation_status TEXT NOT NULL DEFAULT 'awaiting_supplier'
     CHECK (allocation_status IN ('awaiting_supplier', 'accepted', 'rejected', 'dispatch_pending', 'shipped', 'delivered', 'cancelled', 'return_pending', 'returned', 'disputed')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
