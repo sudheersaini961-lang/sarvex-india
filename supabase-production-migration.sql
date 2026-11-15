@@ -3543,4 +3543,411 @@ COMMENT ON TABLE public.supplier_order_allocations IS
 COMMENT ON TABLE public.supplier_fulfilment_events IS
   'Private supplier fulfilment event ledger. Courier integration and signed webhooks are not implemented.';
 
+
+-- ============================================================================
+-- 17. SUPPLIER / RESELLER WORKSPACE RPCs (NO CUSTOMER CHECKOUT YET)
+-- All writes are authenticated SECURITY DEFINER RPCs. Browser roles retain
+-- zero direct table privileges. Public catalog and supplier order checkout
+-- are intentionally not exposed by this milestone.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.supplier_apply(
+  p_business_name TEXT,
+  p_dispatch_contact_name TEXT,
+  p_dispatch_phone TEXT,
+  p_dispatch_address TEXT,
+  p_dispatch_city TEXT,
+  p_dispatch_state TEXT,
+  p_dispatch_pincode TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, auth, pg_temp
+AS $
+DECLARE
+  v_uid UUID := auth.uid();
+  v_shop_id UUID;
+  v_supplier_id UUID;
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+  IF length(trim(COALESCE(p_business_name, ''))) NOT BETWEEN 2 AND 120
+     OR length(trim(COALESCE(p_dispatch_contact_name, ''))) NOT BETWEEN 2 AND 100
+     OR trim(COALESCE(p_dispatch_phone, '')) !~ '^[6-9][0-9]{9}
+
+     OR length(trim(COALESCE(p_dispatch_address, ''))) NOT BETWEEN 8 AND 300
+     OR length(trim(COALESCE(p_dispatch_city, ''))) NOT BETWEEN 2 AND 80
+     OR length(trim(COALESCE(p_dispatch_state, ''))) NOT BETWEEN 2 AND 80
+     OR trim(COALESCE(p_dispatch_pincode, '')) !~ '^[1-9][0-9]{5}
+ THEN
+    RAISE EXCEPTION 'Supplier application details are invalid';
+  END IF;
+
+  SELECT id INTO v_shop_id
+  FROM public.seller_shops
+  WHERE owner_id = v_uid AND approval_status = 'approved'
+  ORDER BY created_at ASC
+  LIMIT 1;
+
+  IF v_shop_id IS NULL THEN
+    RAISE EXCEPTION 'An approved SARVEX seller shop is required before supplier application';
+  END IF;
+
+  INSERT INTO public.supplier_profiles (
+    seller_shop_id, business_name, dispatch_contact_name, dispatch_phone,
+    dispatch_address, dispatch_city, dispatch_state, dispatch_pincode
+  ) VALUES (
+    v_shop_id, trim(p_business_name), trim(p_dispatch_contact_name),
+    trim(p_dispatch_phone), trim(p_dispatch_address), trim(p_dispatch_city),
+    trim(p_dispatch_state), trim(p_dispatch_pincode)
+  )
+  RETURNING id INTO v_supplier_id;
+
+  RETURN jsonb_build_object('supplier_id', v_supplier_id, 'approval_status', 'pending');
+END;
+$;
+
+CREATE OR REPLACE FUNCTION public.supplier_save_stock(
+  p_stock_id UUID,
+  p_supplier_sku TEXT,
+  p_product_name TEXT,
+  p_description TEXT,
+  p_category TEXT,
+  p_image_url TEXT,
+  p_available_quantity INTEGER,
+  p_active BOOLEAN
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, auth, pg_temp
+AS $
+DECLARE
+  v_uid UUID := auth.uid();
+  v_supplier_id UUID;
+  v_stock_id UUID;
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+  IF length(trim(COALESCE(p_product_name, ''))) NOT BETWEEN 2 AND 180
+     OR length(trim(COALESCE(p_category, ''))) NOT BETWEEN 2 AND 80
+     OR p_available_quantity IS NULL OR p_available_quantity < 0
+     OR p_available_quantity > 1000000
+     OR (p_supplier_sku IS NOT NULL AND length(trim(p_supplier_sku)) > 80)
+     OR (p_description IS NOT NULL AND length(p_description) > 5000)
+     OR (p_image_url IS NOT NULL AND p_image_url !~ '^https://[^[:space:]]+
+) THEN
+    RAISE EXCEPTION 'Supplier stock details are invalid';
+  END IF;
+
+  SELECT sp.id INTO v_supplier_id
+  FROM public.supplier_profiles sp
+  JOIN public.seller_shops ss ON ss.id = sp.seller_shop_id
+  WHERE ss.owner_id = v_uid AND ss.approval_status = 'approved'
+    AND sp.approval_status = 'approved'
+  LIMIT 1;
+  IF v_supplier_id IS NULL THEN RAISE EXCEPTION 'Approved supplier account required'; END IF;
+
+  IF p_stock_id IS NULL THEN
+    INSERT INTO public.supplier_stock (
+      supplier_id, supplier_sku, product_name, description, category,
+      image_url, available_quantity, active
+    ) VALUES (
+      v_supplier_id, NULLIF(trim(p_supplier_sku), ''), trim(p_product_name),
+      NULLIF(trim(p_description), ''), trim(p_category), p_image_url,
+      p_available_quantity, COALESCE(p_active, false)
+    ) RETURNING id INTO v_stock_id;
+  ELSE
+    UPDATE public.supplier_stock
+    SET supplier_sku = NULLIF(trim(p_supplier_sku), ''),
+        product_name = trim(p_product_name),
+        description = NULLIF(trim(p_description), ''),
+        category = trim(p_category),
+        image_url = p_image_url,
+        available_quantity = p_available_quantity,
+        active = COALESCE(p_active, false),
+        updated_at = NOW()
+    WHERE id = p_stock_id AND supplier_id = v_supplier_id
+    RETURNING id INTO v_stock_id;
+    IF v_stock_id IS NULL THEN RAISE EXCEPTION 'Stock item not found or not owned by this supplier'; END IF;
+  END IF;
+
+  RETURN jsonb_build_object('stock_id', v_stock_id, 'saved', true);
+END;
+$;
+
+CREATE OR REPLACE FUNCTION public.supplier_create_offer(
+  p_supplier_stock_id UUID,
+  p_wholesale_price_inr NUMERIC,
+  p_minimum_order_quantity INTEGER,
+  p_direct_to_customer_dispatch BOOLEAN
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, auth, pg_temp
+AS $
+DECLARE
+  v_uid UUID := auth.uid();
+  v_supplier_id UUID;
+  v_offer_id UUID;
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+  IF p_wholesale_price_inr IS NULL OR p_wholesale_price_inr <= 0
+     OR p_wholesale_price_inr > 100000000
+     OR p_wholesale_price_inr <> round(p_wholesale_price_inr, 2)
+     OR p_minimum_order_quantity IS NULL OR p_minimum_order_quantity NOT BETWEEN 1 AND 1000 THEN
+    RAISE EXCEPTION 'Supplier offer price or minimum quantity is invalid';
+  END IF;
+
+  SELECT sp.id INTO v_supplier_id
+  FROM public.supplier_profiles sp
+  JOIN public.seller_shops ss ON ss.id = sp.seller_shop_id
+  JOIN public.supplier_stock st ON st.supplier_id = sp.id
+  WHERE ss.owner_id = v_uid AND ss.approval_status = 'approved'
+    AND sp.approval_status = 'approved'
+    AND st.id = p_supplier_stock_id AND st.active = true
+  LIMIT 1;
+  IF v_supplier_id IS NULL THEN RAISE EXCEPTION 'Active stock owned by an approved supplier is required'; END IF;
+
+  INSERT INTO public.supplier_offers (
+    supplier_id, supplier_stock_id, wholesale_price_inr,
+    minimum_order_quantity, direct_to_customer_dispatch, offer_status
+  ) VALUES (
+    v_supplier_id, p_supplier_stock_id, p_wholesale_price_inr,
+    p_minimum_order_quantity, COALESCE(p_direct_to_customer_dispatch, false), 'pending'
+  ) RETURNING id INTO v_offer_id;
+
+  RETURN jsonb_build_object('offer_id', v_offer_id, 'offer_status', 'pending');
+END;
+$;
+
+CREATE OR REPLACE FUNCTION public.reseller_create_listing(
+  p_supplier_offer_id UUID,
+  p_retail_price_inr NUMERIC,
+  p_public_title TEXT,
+  p_public_description TEXT,
+  p_public_image_url TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, auth, pg_temp
+AS $
+DECLARE
+  v_uid UUID := auth.uid();
+  v_reseller_shop_id UUID;
+  v_listing_id UUID;
+  v_wholesale NUMERIC(12,2);
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+  IF p_retail_price_inr IS NULL OR p_retail_price_inr <= 0
+     OR p_retail_price_inr > 100000000
+     OR p_retail_price_inr <> round(p_retail_price_inr, 2)
+     OR length(trim(COALESCE(p_public_title, ''))) NOT BETWEEN 2 AND 180
+     OR (p_public_description IS NOT NULL AND length(p_public_description) > 5000)
+     OR (p_public_image_url IS NOT NULL AND p_public_image_url !~ '^https://[^[:space:]]+
+) THEN
+    RAISE EXCEPTION 'Reseller listing details are invalid';
+  END IF;
+
+  SELECT id INTO v_reseller_shop_id
+  FROM public.seller_shops
+  WHERE owner_id = v_uid AND approval_status = 'approved'
+  ORDER BY created_at ASC
+  LIMIT 1;
+  IF v_reseller_shop_id IS NULL THEN RAISE EXCEPTION 'An approved SARVEX seller shop is required'; END IF;
+
+  SELECT so.wholesale_price_inr INTO v_wholesale
+  FROM public.supplier_offers so
+  JOIN public.supplier_profiles sp ON sp.id = so.supplier_id
+  JOIN public.supplier_stock st ON st.id = so.supplier_stock_id AND st.supplier_id = so.supplier_id
+  WHERE so.id = p_supplier_offer_id AND so.offer_status = 'active'
+    AND sp.approval_status = 'approved' AND st.active = true
+    AND st.available_quantity >= so.minimum_order_quantity;
+  IF v_wholesale IS NULL THEN RAISE EXCEPTION 'Active approved supplier offer is unavailable'; END IF;
+  IF p_retail_price_inr < v_wholesale THEN
+    RAISE EXCEPTION 'Retail price cannot be lower than supplier wholesale price';
+  END IF;
+
+  INSERT INTO public.reseller_listings (
+    reseller_shop_id, supplier_offer_id, retail_price_inr,
+    listing_status, public_title, public_description, public_image_url
+  ) VALUES (
+    v_reseller_shop_id, p_supplier_offer_id, p_retail_price_inr,
+    'pending', trim(p_public_title), NULLIF(trim(p_public_description), ''),
+    p_public_image_url
+  ) RETURNING id INTO v_listing_id;
+
+  RETURN jsonb_build_object('listing_id', v_listing_id, 'listing_status', 'pending');
+END;
+$;
+
+CREATE OR REPLACE FUNCTION public.admin_review_supplier(
+  p_supplier_id UUID,
+  p_approval_status TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, auth, pg_temp
+AS $
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_sarvex_admin() THEN
+    RAISE EXCEPTION 'SARVEX administrator access required';
+  END IF;
+  IF p_approval_status NOT IN ('approved', 'rejected', 'suspended') THEN
+    RAISE EXCEPTION 'Invalid supplier approval decision';
+  END IF;
+  UPDATE public.supplier_profiles
+  SET approval_status = p_approval_status,
+      approved_by = CASE WHEN p_approval_status = 'approved' THEN auth.uid() ELSE NULL END,
+      approved_at = CASE WHEN p_approval_status = 'approved' THEN NOW() ELSE NULL END,
+      updated_at = NOW()
+  WHERE id = p_supplier_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Supplier application not found'; END IF;
+  RETURN jsonb_build_object('supplier_id', p_supplier_id, 'approval_status', p_approval_status);
+END;
+$;
+
+CREATE OR REPLACE FUNCTION public.admin_review_supplier_offer(
+  p_offer_id UUID,
+  p_offer_status TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, auth, pg_temp
+AS $
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_sarvex_admin() THEN
+    RAISE EXCEPTION 'SARVEX administrator access required';
+  END IF;
+  IF p_offer_status NOT IN ('active', 'rejected', 'paused', 'retired') THEN
+    RAISE EXCEPTION 'Invalid supplier offer decision';
+  END IF;
+  UPDATE public.supplier_offers so
+  SET offer_status = p_offer_status, updated_at = NOW()
+  WHERE so.id = p_offer_id
+    AND EXISTS (
+      SELECT 1 FROM public.supplier_profiles sp
+      JOIN public.seller_shops ss ON ss.id = sp.seller_shop_id
+      JOIN public.supplier_stock st ON st.id = so.supplier_stock_id AND st.supplier_id = sp.id
+      WHERE sp.id = so.supplier_id AND sp.approval_status = 'approved'
+        AND ss.approval_status = 'approved' AND st.active = true
+    );
+  IF NOT FOUND THEN RAISE EXCEPTION 'Offer not found or supplier/stock is not eligible'; END IF;
+  RETURN jsonb_build_object('offer_id', p_offer_id, 'offer_status', p_offer_status);
+END;
+$;
+
+CREATE OR REPLACE FUNCTION public.admin_review_reseller_listing(
+  p_listing_id UUID,
+  p_listing_status TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, auth, pg_temp
+AS $
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.is_sarvex_admin() THEN
+    RAISE EXCEPTION 'SARVEX administrator access required';
+  END IF;
+  IF p_listing_status NOT IN ('active', 'rejected', 'paused', 'retired') THEN
+    RAISE EXCEPTION 'Invalid reseller listing decision';
+  END IF;
+  UPDATE public.reseller_listings rl
+  SET listing_status = p_listing_status, updated_at = NOW()
+  WHERE rl.id = p_listing_id
+    AND EXISTS (
+      SELECT 1 FROM public.seller_shops rs
+      JOIN public.supplier_offers so ON so.id = rl.supplier_offer_id
+      JOIN public.supplier_profiles sp ON sp.id = so.supplier_id
+      JOIN public.supplier_stock st ON st.id = so.supplier_stock_id AND st.supplier_id = sp.id
+      WHERE rs.id = rl.reseller_shop_id AND rs.approval_status = 'approved'
+        AND so.offer_status = 'active' AND sp.approval_status = 'approved'
+        AND st.active = true
+    );
+  IF NOT FOUND THEN RAISE EXCEPTION 'Reseller listing not found or source offer is not eligible'; END IF;
+  RETURN jsonb_build_object('listing_id', p_listing_id, 'listing_status', p_listing_status);
+END;
+$;
+
+CREATE OR REPLACE FUNCTION public.get_my_supplier_workspace()
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, auth, pg_temp
+AS $
+DECLARE
+  v_uid UUID := auth.uid();
+  v_supplier JSONB;
+  v_stock JSONB;
+  v_offers JSONB;
+  v_reseller_listings JSONB;
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
+
+  SELECT to_jsonb(sp) INTO v_supplier
+  FROM public.supplier_profiles sp
+  JOIN public.seller_shops ss ON ss.id = sp.seller_shop_id
+  WHERE ss.owner_id = v_uid AND ss.approval_status = 'approved'
+  LIMIT 1;
+
+  SELECT COALESCE(jsonb_agg(to_jsonb(st) ORDER BY st.created_at DESC), '[]'::jsonb)
+  INTO v_stock
+  FROM public.supplier_stock st
+  JOIN public.supplier_profiles sp ON sp.id = st.supplier_id
+  JOIN public.seller_shops ss ON ss.id = sp.seller_shop_id
+  WHERE ss.owner_id = v_uid;
+
+  SELECT COALESCE(jsonb_agg(to_jsonb(so) ORDER BY so.created_at DESC), '[]'::jsonb)
+  INTO v_offers
+  FROM public.supplier_offers so
+  JOIN public.supplier_profiles sp ON sp.id = so.supplier_id
+  JOIN public.seller_shops ss ON ss.id = sp.seller_shop_id
+  WHERE ss.owner_id = v_uid;
+
+  SELECT COALESCE(jsonb_agg(
+    jsonb_build_object(
+      'id', rl.id, 'supplier_offer_id', rl.supplier_offer_id,
+      'retail_price_inr', rl.retail_price_inr, 'listing_status', rl.listing_status,
+      'public_title', rl.public_title, 'created_at', rl.created_at,
+      'wholesale_price_inr', so.wholesale_price_inr,
+      'minimum_order_quantity', so.minimum_order_quantity
+    ) ORDER BY rl.created_at DESC
+  ), '[]'::jsonb)
+  INTO v_reseller_listings
+  FROM public.reseller_listings rl
+  JOIN public.seller_shops rs ON rs.id = rl.reseller_shop_id
+  JOIN public.supplier_offers so ON so.id = rl.supplier_offer_id
+  WHERE rs.owner_id = v_uid;
+
+  RETURN jsonb_build_object(
+    'supplier_profile', v_supplier,
+    'stock', v_stock,
+    'supplier_offers', v_offers,
+    'reseller_listings', v_reseller_listings
+  );
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.supplier_apply(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,TEXT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.supplier_save_stock(UUID,TEXT,TEXT,TEXT,TEXT,TEXT,INTEGER,BOOLEAN) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.supplier_create_offer(UUID,NUMERIC,INTEGER,BOOLEAN) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.reseller_create_listing(UUID,NUMERIC,TEXT,TEXT,TEXT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.admin_review_supplier(UUID,TEXT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.admin_review_supplier_offer(UUID,TEXT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.admin_review_reseller_listing(UUID,TEXT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.get_my_supplier_workspace() FROM PUBLIC, anon;
+
+GRANT EXECUTE ON FUNCTION public.supplier_apply(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.supplier_save_stock(UUID,TEXT,TEXT,TEXT,TEXT,TEXT,INTEGER,BOOLEAN) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.supplier_create_offer(UUID,NUMERIC,INTEGER,BOOLEAN) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.reseller_create_listing(UUID,NUMERIC,TEXT,TEXT,TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_review_supplier(UUID,TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_review_supplier_offer(UUID,TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_review_reseller_listing(UUID,TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.get_my_supplier_workspace() TO authenticated, service_role;
+
+
 COMMIT;
