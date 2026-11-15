@@ -888,7 +888,8 @@ export function useMarketplace() {
     if (requiredCheckoutFields.some((value) => typeof value !== 'string' || !value.trim())) {
       throw new Error('Please complete your name, phone number and full delivery address.');
     }
-    if (!/^[6-9][0-9]{9}$/.test(orderData.customerPhone.replace(/\\D/g, ''))) {
+    const normalizedPhone = orderData.customerPhone.replace(/\D/g, '');
+    if (!/^[6-9][0-9]{9}$/.test(normalizedPhone)) {
       throw new Error('Enter a valid 10-digit Indian mobile number.');
     }
     if (!/^[1-9][0-9]{5}$/.test(orderData.pincode.trim())) {
@@ -923,7 +924,7 @@ export function useMarketplace() {
       id: orderCode, // Unique collision-resistant order code
       customerId: globalState.currentUser?.id || generateUuid(),
       customerName: orderData.customerName,
-      customerPhone: orderData.customerPhone,
+      customerPhone: normalizedPhone,
       customerEmail: orderData.customerEmail,
       shippingAddress: orderData.shippingAddress,
       city: orderData.city,
@@ -947,7 +948,7 @@ export function useMarketplace() {
     if (supabase) {
       const basePayload = {
         p_customer_name: orderData.customerName,
-        p_customer_phone: orderData.customerPhone,
+        p_customer_phone: normalizedPhone,
         p_customer_email: orderData.customerEmail || '',
         p_shipping_address: orderData.shippingAddress,
         p_city: orderData.city,
