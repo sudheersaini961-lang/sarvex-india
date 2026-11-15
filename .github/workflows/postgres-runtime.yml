@@ -1,0 +1,83 @@
+name: SARVEX PostgreSQL Runtime Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/public-seller-sync-security
+    paths:
+      - "supabase-production-migration.sql"
+      - "supabase/config.toml"
+      - "supabase/tests/**"
+      - ".github/workflows/postgres-runtime.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sarvex-postgres-runtime-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migration-runtime:
+    name: Supabase local stack / PostgreSQL ${{ matrix.pg }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ["15", "16"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Select PostgreSQL major version
+        shell: bash
+        run: |
+          sed -i 's/^major_version = .*/major_version = ${{ matrix.pg }}/' supabase/config.toml
+          grep -q "^major_version = ${{ matrix.pg }}$" supabase/config.toml
+
+      - name: Start isolated local Supabase stack
+        run: supabase start -x studio,inbucket,imgproxy,edge-runtime,logflare,vector
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Apply production migration (first run)
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          test -n "${DB_URL:-}"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
+
+      - name: Verify migration runtime invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
+
+      - name: Apply migration again (idempotency check)
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
+
+      - name: Verify idempotent re-application
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: supabase stop --no-backup
