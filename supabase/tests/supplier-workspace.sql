@@ -12,6 +12,7 @@ DECLARE
   v_supplier_id UUID;
   v_stock_id UUID;
   v_offer_id UUID;
+  v_non_dispatch_offer_id UUID;
   v_listing_id UUID;
   v_result JSONB;
   v_blocked BOOLEAN;
@@ -71,6 +72,27 @@ BEGIN
 
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
   PERFORM public.admin_review_supplier_offer(v_offer_id, 'active');
+
+  -- An active wholesale offer without supplier-direct dispatch must not be
+  -- selectable for a reseller-to-customer fulfilment listing.
+  PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
+  v_result := public.supplier_create_offer(v_stock_id, 90.00, 1, false);
+  v_non_dispatch_offer_id := (v_result ->> 'offer_id')::uuid;
+  PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  PERFORM public.admin_review_supplier_offer(v_non_dispatch_offer_id, 'active');
+
+  PERFORM set_config('request.jwt.claim.sub', v_reseller::text, true);
+  v_blocked := false;
+  BEGIN
+    PERFORM public.reseller_create_listing(
+      v_non_dispatch_offer_id, 140.00, 'Should Not List', NULL, NULL
+    );
+  EXCEPTION WHEN OTHERS THEN
+    v_blocked := true;
+  END;
+  IF NOT v_blocked THEN
+    RAISE EXCEPTION 'Reseller listing accepted an offer without direct-to-customer dispatch';
+  END IF;
 
   PERFORM set_config('request.jwt.claim.sub', v_reseller::text, true);
   v_result := public.browse_supplier_offers();
