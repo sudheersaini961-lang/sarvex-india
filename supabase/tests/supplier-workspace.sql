@@ -135,7 +135,7 @@ BEGIN
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
   v_result := public.get_my_supplier_workspace();
   IF jsonb_array_length(v_result -> 'stock') <> 1
-     OR jsonb_array_length(v_result -> 'supplier_offers') <> 1
+     OR jsonb_array_length(v_result -> 'supplier_offers') <> 2
      OR jsonb_array_length(v_result -> 'reseller_listings') <> 0 THEN
     RAISE EXCEPTION 'Supplier workspace owner isolation failed: %', v_result;
   END IF;
