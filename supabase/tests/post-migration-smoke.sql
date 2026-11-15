@@ -73,6 +73,62 @@ BEGIN
     RAISE EXCEPTION 'Authenticated role cannot execute checkout RPC';
   END IF;
 
+
+  -- Private supplier/dropshipping foundation: tables must exist, use RLS,
+  -- and remain inaccessible to browser roles until trusted RPCs are added.
+  FOREACH required_table IN ARRAY ARRAY[
+    'supplier_profiles',
+    'supplier_stock',
+    'supplier_offers',
+    'reseller_listings',
+    'supplier_order_allocations',
+    'supplier_fulfilment_events'
+  ] LOOP
+    IF to_regclass(format('public.%I', required_table)) IS NULL THEN
+      RAISE EXCEPTION 'Missing private supplier foundation table: public.%', required_table;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE n.nspname = 'public'
+        AND c.relname = required_table
+        AND c.relrowsecurity
+    ) THEN
+      RAISE EXCEPTION 'RLS is not enabled on private supplier table public.%', required_table;
+    END IF;
+
+    IF has_table_privilege('anon', format('public.%I', required_table), 'SELECT')
+       OR has_table_privilege('anon', format('public.%I', required_table), 'INSERT')
+       OR has_table_privilege('authenticated', format('public.%I', required_table), 'SELECT')
+       OR has_table_privilege('authenticated', format('public.%I', required_table), 'INSERT')
+       OR has_table_privilege('authenticated', format('public.%I', required_table), 'UPDATE')
+       OR has_table_privilege('authenticated', format('public.%I', required_table), 'DELETE') THEN
+      RAISE EXCEPTION 'Browser role has direct access to private supplier table public.%', required_table;
+    END IF;
+
+    IF NOT has_table_privilege('service_role', format('public.%I', required_table), 'SELECT')
+       OR NOT has_table_privilege('service_role', format('public.%I', required_table), 'INSERT')
+       OR NOT has_table_privilege('service_role', format('public.%I', required_table), 'UPDATE')
+       OR NOT has_table_privilege('service_role', format('public.%I', required_table), 'DELETE') THEN
+      RAISE EXCEPTION 'Trusted service_role lacks expected access to public.%', required_table;
+    END IF;
+  END LOOP;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.supplier_order_allocations'::regclass
+      AND conname = 'supplier_order_allocations_payment_method_check'
+  ) THEN
+    RAISE EXCEPTION 'Supplier allocation must explicitly restrict payment methods (COD is not enabled)';
+  END IF;
+
+  IF has_table_privilege('authenticated', 'public.supplier_order_allocations', 'SELECT') THEN
+    RAISE EXCEPTION 'Authenticated users must not read supplier wholesale or payout snapshots';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM storage.buckets
     WHERE id = 'product-images' AND public = true
