@@ -106,3 +106,36 @@ Automated delivery is a staged capability:
 6. live low-risk pilot with explicit supplier consent.
 
 Until these gates pass, label shipment actions as manual/pending. Never show a generated tracking number, delivery ETA, pickup booking, or successful courier handoff unless the provider confirms it.
+
+
+## Repository checkout review (2026-11-15)
+
+Reviewed the current root migration, checkout RPC, seller order view, smoke assertions, and the marketplace store client. This is a source review only; no SQL was executed and no live database was contacted.
+
+### Verified current checkout behavior
+
+- Checkout is authenticated and uses the database-side `place_sarvex_order` RPC (the 9-argument idempotent form, with an 8-argument compatibility wrapper).
+- The RPC accepts product IDs and quantities from the client, but reads authoritative product price, seller ownership, seller approval, commission rate, and stock from PostgreSQL.
+- It groups duplicate product IDs, sorts product UUIDs before row locking, checks stock, calculates the order total and seller commission server-side, inserts the order and order items, deducts stock in the same transaction, clears the customer's database cart, and stores an idempotency response.
+- The current order-item schema has a single `seller_shop_id` and seller commission/payable fields. It has no supplier ID, supplier offer, reseller ID, fulfilment-mode snapshot, supplier payable, courier shipment, or dispatch-event fields.
+- Checkout currently writes payment method `cod` directly. This is not a configurable dropshipping payment gate and must not be reused for supplier dropship orders.
+- `seller_order_items_view` exposes the delivery details needed by an approved seller to fulfil their own items. It is not a supplier-specific access view and must not be broadened to expose customer details to every supplier or reseller.
+- The app store currently loads the existing `products` table and calls the existing checkout RPC. It has no supplier offer, reseller listing, product-source import, courier provider, or shipment-webhook integration.
+
+### Implementation decisions before changing SQL
+
+1. Preserve the existing direct-seller checkout path and its RPC signatures. Do not silently change its semantics while adding dropshipping.
+2. Introduce supplier capabilities as separately approved records; an approved seller is not automatically an approved supplier.
+3. Model supplier stock/offers and reseller listings independently from public catalogue rows. The public catalogue must expose only approved retail fields; wholesale costs, supplier contact details, private dispatch address, and reseller margin remain private.
+4. For the first database milestone, support only an explicitly approved supplier offer and supplier-managed dispatch record. Do not claim automated courier booking until a provider account, server-side credentials, signed webhooks, pickup-origin checks, and sandbox tests exist.
+5. Keep dropship COD unavailable. The existing COD-only RPC is not safe to extend by simply accepting a client-supplied fulfilment flag. A separate trusted transaction path must validate the approved offer, lock and reserve supplier stock, snapshot all commercial amounts, and create supplier allocation records atomically.
+6. A pasted Flipkart/Meesho URL must never be treated as proof of resale permission or a valid source feed. The first safe release should accept a manually reviewed supplier-authorised catalogue entry; source-specific API adapters can be added only after documented access is available.
+7. Add PG15 and PG16 tests for supplier/reseller ownership isolation, wholesale privacy, approval gates, concurrent stock reservation, tampered amounts/IDs, supplier accept/reject, fulfilment event permissions, idempotency, and rerunnable migration. Existing checkout tests must continue passing unchanged.
+
+### Review status
+
+- Existing seller checkout source mapping: REVIEWED.
+- Dropshipping schema and RPC implementation: NOT IMPLEMENTED.
+- Supplier/reseller UI and product-link import: NOT IMPLEMENTED.
+- Courier booking and live tracking: NOT IMPLEMENTED.
+- Live Supabase verification and physical Android verification: NOT VERIFIED.
