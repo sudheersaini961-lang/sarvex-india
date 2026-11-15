@@ -3759,9 +3759,13 @@ BEGIN
   SELECT so.wholesale_price_inr INTO v_wholesale
   FROM public.supplier_offers so
   JOIN public.supplier_profiles sp ON sp.id = so.supplier_id
+  JOIN public.seller_shops supplier_shop ON supplier_shop.id = sp.seller_shop_id
   JOIN public.supplier_stock st ON st.id = so.supplier_stock_id AND st.supplier_id = so.supplier_id
   WHERE so.id = p_supplier_offer_id AND so.offer_status = 'active'
-    AND sp.approval_status = 'approved' AND st.active = true
+    AND so.direct_to_customer_dispatch = true
+    AND sp.approval_status = 'approved'
+    AND supplier_shop.approval_status = 'approved'
+    AND st.active = true
     AND st.available_quantity >= so.minimum_order_quantity;
   IF v_wholesale IS NULL THEN RAISE EXCEPTION 'Active approved supplier offer is unavailable'; END IF;
   IF p_retail_price_inr < v_wholesale THEN
@@ -3862,9 +3866,12 @@ BEGIN
       SELECT 1 FROM public.seller_shops rs
       JOIN public.supplier_offers so ON so.id = rl.supplier_offer_id
       JOIN public.supplier_profiles sp ON sp.id = so.supplier_id
+      JOIN public.seller_shops supplier_shop ON supplier_shop.id = sp.seller_shop_id
       JOIN public.supplier_stock st ON st.id = so.supplier_stock_id AND st.supplier_id = sp.id
       WHERE rs.id = rl.reseller_shop_id AND rs.approval_status = 'approved'
-        AND so.offer_status = 'active' AND sp.approval_status = 'approved'
+        AND so.offer_status = 'active' AND so.direct_to_customer_dispatch = true
+        AND sp.approval_status = 'approved'
+        AND supplier_shop.approval_status = 'approved'
         AND st.active = true
     );
   IF NOT FOUND THEN RAISE EXCEPTION 'Reseller listing not found or source offer is not eligible'; END IF;
