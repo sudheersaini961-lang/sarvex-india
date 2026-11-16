@@ -2,7 +2,7 @@
 
 ## Status
 
-Foundation and a read-only public catalogue projection implemented on the working branch only. The repository contains private supplier/stock/offer/reseller/allocation/event tables, authenticated supplier/reseller RPCs, a seller-side supplier workspace, an admin review queue, and an anonymous-safe retail-only catalogue RPC. This is not a live deployment and does not enable customer dropship checkout, supplier order allocation, COD, or courier automation.
+Foundation and a read-only public catalogue projection implemented on the working branch only. The repository contains private supplier/stock/offer/reseller/allocation/event tables, authenticated supplier/reseller/fulfilment RPCs, a seller-side supplier workspace with acceptance and manual dispatch controls, an admin review queue, and an anonymous-safe retail-only catalogue RPC. This is not a live deployment and does not enable customer dropship checkout, supplier order allocation, COD, or courier automation.
 
 ## Business roles
 
