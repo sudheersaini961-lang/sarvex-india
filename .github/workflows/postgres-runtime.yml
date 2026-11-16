@@ -96,6 +96,12 @@ jobs:
       - name: Reapply dropship checkout reservation migration (idempotency check)
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160003_dropship_checkout_reservations.sql
 
+      - name: Apply migration again (idempotency check)
+        run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
+
+      - name: Verify idempotent re-application
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
+
       - name: Apply COD fail-closed migration
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160004_cod_fail_closed_gate.sql
 
@@ -104,12 +110,6 @@ jobs:
 
       - name: Reapply COD fail-closed migration (idempotency check)
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160004_cod_fail_closed_gate.sql
-
-      - name: Apply migration again (idempotency check)
-        run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
-
-      - name: Verify idempotent re-application
-        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
 
   live-supabase-readonly:
     name: Optional live Supabase REST connectivity check
