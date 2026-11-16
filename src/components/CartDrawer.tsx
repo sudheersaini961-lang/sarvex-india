@@ -5,8 +5,7 @@ import {
   Minus,
   Trash2,
   ShoppingBag,
-  ShieldCheck,
-  
+  ShieldCheck
 } from 'lucide-react';
 import { useMarketplace } from '../lib/marketplaceStore';
 
@@ -216,7 +215,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   ₹{cartTotalAmount.toLocaleString('en-IN')}
                 </p>
               </div>
-              <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">
+              <span className="text-[11px] text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded">
                 COD setup pending
               </span>
             </div>
