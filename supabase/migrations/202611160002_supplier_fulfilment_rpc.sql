@@ -97,15 +97,15 @@ BEGIN
   IF v_uid IS NULL THEN
     RAISE EXCEPTION 'Authentication required';
   END IF;
-  IF p_allocation_id IS NULL OR p_action NOT IN ('accept', 'reject', 'packed', 'shipped') THEN
+  IF p_allocation_id IS NULL OR p_action IS NULL OR p_action NOT IN ('accept', 'reject', 'packed', 'shipped') THEN
     RAISE EXCEPTION 'Invalid fulfilment action';
   END IF;
   IF v_note IS NOT NULL AND length(v_note) > 500 THEN
     RAISE EXCEPTION 'Fulfilment note is too long';
   END IF;
 
-  SELECT a.*, sp.approval_status, ss.approval_status
-  INTO v_allocation, v_supplier_status, v_shop_status
+  SELECT a.*
+  INTO v_allocation
   FROM public.supplier_order_allocations a
   JOIN public.supplier_profiles sp ON sp.id = a.supplier_id
   JOIN public.seller_shops ss ON ss.id = sp.seller_shop_id
@@ -116,6 +116,12 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Supplier allocation not found';
   END IF;
+
+  SELECT sp.approval_status, ss.approval_status
+  INTO v_supplier_status, v_shop_status
+  FROM public.supplier_profiles sp
+  JOIN public.seller_shops ss ON ss.id = sp.seller_shop_id
+  WHERE sp.id = v_allocation.supplier_id AND ss.owner_id = v_uid;
   IF v_shop_status <> 'approved' THEN
     RAISE EXCEPTION 'Approved seller shop required';
   END IF;
