@@ -27,9 +27,15 @@ BEGIN
         'quantity', a.quantity,
         'fulfilment_mode', a.fulfilment_mode,
         'allocation_status', a.allocation_status,
-        'city', o.city,
-        'state', o.state,
-        'pincode', o.pincode,
+        'city', CASE
+          WHEN a.allocation_status IN ('accepted', 'dispatch_pending', 'shipped')
+          THEN o.city ELSE NULL END,
+        'state', CASE
+          WHEN a.allocation_status IN ('accepted', 'dispatch_pending', 'shipped')
+          THEN o.state ELSE NULL END,
+        'pincode', CASE
+          WHEN a.allocation_status IN ('accepted', 'dispatch_pending', 'shipped')
+          THEN o.pincode ELSE NULL END,
         'customer_name', CASE
           WHEN a.allocation_status IN ('accepted', 'dispatch_pending', 'shipped')
           THEN o.customer_name ELSE NULL END,
