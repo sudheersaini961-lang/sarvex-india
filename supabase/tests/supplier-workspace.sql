@@ -31,11 +31,13 @@ BEGIN
     (v_supplier_shop, v_supplier, 'Synthetic Supplier Shop', 'pending', 'Supplier Test'),
     (v_reseller_shop, v_reseller, 'Synthetic Reseller Shop', 'pending', 'Reseller Test');
 
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
   UPDATE public.seller_shops
   SET approval_status = 'approved'
   WHERE id IN (v_supplier_shop, v_reseller_shop);
 
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
   v_result := public.supplier_apply(
     'Synthetic Supplier Business', 'Supplier Contact', '9876543210',
@@ -56,6 +58,7 @@ BEGIN
   IF NOT v_blocked THEN RAISE EXCEPTION 'Pending supplier unexpectedly saved stock'; END IF;
 
   -- A normal authenticated seller must not read the admin queue or approve suppliers.
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
   v_result := public.admin_list_supplier_review_queue();
   IF v_result IS NULL
@@ -74,6 +77,7 @@ BEGIN
     RAISE EXCEPTION 'Non-admin supplier approved a supplier application';
   END IF;
 
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
   v_result := public.admin_list_supplier_review_queue();
   IF jsonb_array_length(v_result -> 'suppliers') <> 1
@@ -82,6 +86,7 @@ BEGIN
   END IF;
   PERFORM public.admin_review_supplier(v_supplier_id, 'approved');
 
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
   v_result := public.supplier_save_stock(NULL, 'SKU-1', 'Test Product',
     'Supplier-owned test item', 'electronics', 'https://example.invalid/item.jpg', 20, true);
@@ -94,17 +99,21 @@ BEGIN
     RAISE EXCEPTION 'Supplier offer did not enter pending review';
   END IF;
 
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
   PERFORM public.admin_review_supplier_offer(v_offer_id, 'active');
 
   -- An active wholesale offer without supplier-direct dispatch must not be
   -- selectable for a reseller-to-customer fulfilment listing.
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
   v_result := public.supplier_create_offer(v_stock_id, 90.00, 1, false);
   v_non_dispatch_offer_id := (v_result ->> 'offer_id')::uuid;
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
   PERFORM public.admin_review_supplier_offer(v_non_dispatch_offer_id, 'active');
 
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_reseller::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_reseller::text, true);
   v_blocked := false;
   BEGIN
@@ -118,6 +127,7 @@ BEGIN
     RAISE EXCEPTION 'Reseller listing accepted an offer without direct-to-customer dispatch';
   END IF;
 
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_reseller::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_reseller::text, true);
   v_result := public.browse_supplier_offers();
   IF jsonb_array_length(v_result) <> 1
@@ -142,6 +152,7 @@ BEGIN
   END;
   IF NOT v_blocked THEN RAISE EXCEPTION 'Reseller modified another supplier stock'; END IF;
 
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
   UPDATE public.seller_shops SET approval_status = 'pending' WHERE id = v_supplier_shop;
   v_blocked := false;
@@ -156,6 +167,7 @@ BEGIN
   UPDATE public.seller_shops SET approval_status = 'approved' WHERE id = v_supplier_shop;
   PERFORM public.admin_review_reseller_listing(v_listing_id, 'active');
 
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
   v_result := public.get_my_supplier_workspace();
   IF jsonb_array_length(v_result -> 'stock') <> 1
@@ -164,6 +176,7 @@ BEGIN
     RAISE EXCEPTION 'Supplier workspace owner isolation failed: %', v_result;
   END IF;
 
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_reseller::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_reseller::text, true);
   v_result := public.get_my_supplier_workspace();
   IF v_result -> 'supplier_profile' IS DISTINCT FROM 'null'::jsonb
@@ -173,6 +186,7 @@ BEGIN
     RAISE EXCEPTION 'Reseller workspace isolation/privacy failed: %', v_result;
   END IF;
 
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
   v_blocked := false;
   BEGIN
