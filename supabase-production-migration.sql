@@ -379,7 +379,7 @@ CREATE TABLE IF NOT EXISTS public.seller_shops (
   upi_id TEXT,
   bank_account TEXT,
   ifsc_code TEXT,
-  commission_rate NUMERIC DEFAULT 10.0 CHECK (commission_rate >= 0 AND commission_rate <= 100),
+  commission_rate NUMERIC DEFAULT 0.0 CHECK (commission_rate >= 0 AND commission_rate <= 100),
   rating NUMERIC DEFAULT 0.0 CHECK (rating >= 0 AND rating <= 5),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -397,11 +397,11 @@ ALTER TABLE IF EXISTS public.seller_shops
   ADD COLUMN IF NOT EXISTS upi_id TEXT,
   ADD COLUMN IF NOT EXISTS bank_account TEXT,
   ADD COLUMN IF NOT EXISTS ifsc_code TEXT,
-  ADD COLUMN IF NOT EXISTS commission_rate NUMERIC DEFAULT 10.0,
+  ADD COLUMN IF NOT EXISTS commission_rate NUMERIC DEFAULT 0.0,
   ADD COLUMN IF NOT EXISTS rating NUMERIC DEFAULT 0.0 CHECK (rating >= 0 AND rating <= 5);
 
 ALTER TABLE IF EXISTS public.seller_shops
-  ALTER COLUMN commission_rate SET DEFAULT 10.0,
+  ALTER COLUMN commission_rate SET DEFAULT 0.0,
   ALTER COLUMN rating SET DEFAULT 0.0;
 
 -- Idempotent Catalog-Verified Hardening of seller_shops_commission_rate_check (commission_rate >= 0 AND commission_rate <= 100)
@@ -752,7 +752,7 @@ CREATE TABLE IF NOT EXISTS public.order_items (
   product_name TEXT NOT NULL,
   price_inr NUMERIC NOT NULL CHECK (price_inr >= 0),
   quantity INTEGER NOT NULL CHECK (quantity > 0),
-  commission_rate NUMERIC DEFAULT 10.0 CHECK (commission_rate >= 0 AND commission_rate <= 100),
+  commission_rate NUMERIC DEFAULT 0.0 CHECK (commission_rate >= 0 AND commission_rate <= 100),
   commission_amount NUMERIC DEFAULT 0.0 CHECK (commission_amount >= 0),
   seller_payable_amount NUMERIC DEFAULT 0.0 CHECK (seller_payable_amount >= 0),
   image_url TEXT,
@@ -764,7 +764,7 @@ CREATE TABLE IF NOT EXISTS public.order_items (
 ALTER TABLE IF EXISTS public.order_items
   ALTER COLUMN id SET DEFAULT gen_random_uuid(),
   ADD COLUMN IF NOT EXISTS seller_shop_id UUID REFERENCES public.seller_shops(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS commission_rate NUMERIC DEFAULT 10.0,
+  ADD COLUMN IF NOT EXISTS commission_rate NUMERIC DEFAULT 0.0,
   ADD COLUMN IF NOT EXISTS commission_amount NUMERIC DEFAULT 0.0,
   ADD COLUMN IF NOT EXISTS seller_payable_amount NUMERIC DEFAULT 0.0,
   ADD COLUMN IF NOT EXISTS image_url TEXT,
@@ -1798,9 +1798,9 @@ AS $$
 BEGIN
   IF NOT public.is_sarvex_admin() THEN
     IF TG_OP = 'INSERT' THEN
-      -- Force pending status, default platform commission (10%), 0.0 initial rating, and caller ownership on registration
+      -- Force pending status, zero platform commission (0%), 0.0 initial rating, and caller ownership on registration
       NEW.approval_status := 'pending';
-      NEW.commission_rate := 10.0;
+      NEW.commission_rate := 0.0;
       NEW.rating := 0.0;
       NEW.owner_id := auth.uid();
       IF NEW.owner_id IS NULL THEN
@@ -2519,7 +2519,7 @@ BEGIN
       p.image_url,
       s.shop_name,
       s.approval_status AS seller_status,
-      COALESCE(s.commission_rate, 10.0) AS commission_rate
+      COALESCE(s.commission_rate, 0.0) AS commission_rate
     INTO v_prod
     FROM public.products p
     JOIN public.seller_shops s ON s.id = p.seller_shop_id
@@ -2623,7 +2623,7 @@ BEGIN
       p.price_inr,
       p.seller_shop_id,
       p.image_url,
-      COALESCE(s.commission_rate, 10.0) AS commission_rate
+      COALESCE(s.commission_rate, 0.0) AS commission_rate
     INTO v_prod
     FROM public.products p
     LEFT JOIN public.seller_shops s ON s.id = p.seller_shop_id
@@ -2636,7 +2636,7 @@ BEGIN
 
     v_unit_price := ROUND(v_prod.price_inr, 2);
     v_item_subtotal := ROUND(v_unit_price * v_group.total_qty, 2);
-    v_commission_rate := COALESCE(v_prod.commission_rate, 10.0);
+    v_commission_rate := COALESCE(v_prod.commission_rate, 0.0);
     v_commission_amount := ROUND((v_item_subtotal * v_commission_rate / 100.0), 2);
     v_seller_payable := v_item_subtotal - v_commission_amount;
 
