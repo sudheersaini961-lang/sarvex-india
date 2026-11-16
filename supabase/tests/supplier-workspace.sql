@@ -24,6 +24,7 @@ BEGIN
     (v_reseller, 'supplier-workspace-reseller@example.invalid', now());
 
   PERFORM set_config('request.jwt.claim.sub', '', true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   PERFORM public.bootstrap_first_admin(v_admin);
 
   INSERT INTO public.seller_shops (id, owner_id, shop_name, approval_status, owner_name)
@@ -33,12 +34,14 @@ BEGIN
 
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   UPDATE public.seller_shops
   SET approval_status = 'approved'
   WHERE id IN (v_supplier_shop, v_reseller_shop);
 
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   v_result := public.supplier_apply(
     'Synthetic Supplier Business', 'Supplier Contact', '9876543210',
     '12 Test Market Road', 'Jaipur', 'Rajasthan', '302001'
@@ -60,6 +63,7 @@ BEGIN
   -- A normal authenticated seller must not read the admin queue or approve suppliers.
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   v_result := public.admin_list_supplier_review_queue();
   IF v_result IS NULL
      OR jsonb_typeof(v_result) <> 'object'
@@ -79,6 +83,7 @@ BEGIN
 
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   v_result := public.admin_list_supplier_review_queue();
   IF jsonb_array_length(v_result -> 'suppliers') <> 1
      OR v_result -> 'suppliers' -> 0 ->> 'id' <> v_supplier_id::text THEN
@@ -88,6 +93,7 @@ BEGIN
 
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   v_result := public.supplier_save_stock(NULL, 'SKU-1', 'Test Product',
     'Supplier-owned test item', 'electronics', 'https://example.invalid/item.jpg', 20, true);
   v_stock_id := (v_result ->> 'stock_id')::uuid;
@@ -101,20 +107,24 @@ BEGIN
 
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   PERFORM public.admin_review_supplier_offer(v_offer_id, 'active');
 
   -- An active wholesale offer without supplier-direct dispatch must not be
   -- selectable for a reseller-to-customer fulfilment listing.
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   v_result := public.supplier_create_offer(v_stock_id, 90.00, 1, false);
   v_non_dispatch_offer_id := (v_result ->> 'offer_id')::uuid;
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   PERFORM public.admin_review_supplier_offer(v_non_dispatch_offer_id, 'active');
 
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_reseller::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_reseller::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   v_blocked := false;
   BEGIN
     PERFORM public.reseller_create_listing(
@@ -129,6 +139,7 @@ BEGIN
 
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_reseller::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_reseller::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   v_result := public.browse_supplier_offers();
   IF jsonb_array_length(v_result) <> 1
      OR v_result -> 0 ->> 'offer_id' <> v_offer_id::text THEN
@@ -154,6 +165,7 @@ BEGIN
 
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   UPDATE public.seller_shops SET approval_status = 'pending' WHERE id = v_supplier_shop;
   v_blocked := false;
   BEGIN
@@ -169,6 +181,7 @@ BEGIN
 
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   v_result := public.get_my_supplier_workspace();
   IF jsonb_array_length(v_result -> 'stock') <> 1
      OR jsonb_array_length(v_result -> 'supplier_offers') <> 2
@@ -178,6 +191,7 @@ BEGIN
 
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_reseller::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_reseller::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   v_result := public.get_my_supplier_workspace();
   IF v_result -> 'supplier_profile' IS DISTINCT FROM 'null'::jsonb
      OR jsonb_array_length(v_result -> 'stock') <> 0
@@ -188,6 +202,7 @@ BEGIN
 
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   v_blocked := false;
   BEGIN
     PERFORM public.browse_supplier_offers();
