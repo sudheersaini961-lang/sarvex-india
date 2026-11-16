@@ -55,7 +55,34 @@ BEGIN
   END;
   IF NOT v_blocked THEN RAISE EXCEPTION 'Pending supplier unexpectedly saved stock'; END IF;
 
+  -- A normal authenticated seller must not read the admin queue or approve suppliers.
+  PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
+  v_blocked := false;
+  BEGIN
+    PERFORM public.admin_list_supplier_review_queue();
+  EXCEPTION WHEN OTHERS THEN
+    v_blocked := true;
+  END;
+  IF NOT v_blocked THEN
+    RAISE EXCEPTION 'Non-admin supplier read the admin review queue';
+  END IF;
+
+  v_blocked := false;
+  BEGIN
+    PERFORM public.admin_review_supplier(v_supplier_id, 'approved');
+  EXCEPTION WHEN OTHERS THEN
+    v_blocked := true;
+  END;
+  IF NOT v_blocked THEN
+    RAISE EXCEPTION 'Non-admin supplier approved a supplier application';
+  END IF;
+
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
+  v_result := public.admin_list_supplier_review_queue();
+  IF jsonb_array_length(v_result -> 'suppliers') <> 1
+     OR v_result -> 'suppliers' -> 0 ->> 'id' <> v_supplier_id::text THEN
+    RAISE EXCEPTION 'Admin review queue did not return the pending supplier';
+  END IF;
   PERFORM public.admin_review_supplier(v_supplier_id, 'approved');
 
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
