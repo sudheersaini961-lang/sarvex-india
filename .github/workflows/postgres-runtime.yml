@@ -74,6 +74,9 @@ jobs:
       - name: Verify public reseller catalogue privacy (transaction rolled back)
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/public-reseller-catalogue.sql
 
+      - name: Reapply public reseller catalogue migration (idempotency check)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160001_public_reseller_catalogue.sql
+
       - name: Apply migration again (idempotency check)
         run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
 
