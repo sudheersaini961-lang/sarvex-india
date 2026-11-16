@@ -29,7 +29,7 @@ BEGIN
   SELECT pg_get_functiondef('public.protect_seller_shop_status()'::regprocedure)
     INTO v_trigger_source;
   IF position('NEW.commission_rate := 0.00' IN v_trigger_source) = 0 THEN
-    RAISE EXCEPTION 'FAIL: seller registration trigger does not force 0% commission';
+    RAISE EXCEPTION 'FAIL: seller registration trigger does not force 0%% commission';
   END IF;
 
   SELECT pg_get_functiondef('public.place_sarvex_order(text,text,text,text,text,text,text,jsonb,text)'::regprocedure)
