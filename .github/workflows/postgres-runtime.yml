@@ -1,0 +1,140 @@
+name: SARVEX PostgreSQL Runtime Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/public-seller-sync-security
+    paths:
+      - "supabase-production-migration.sql"
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - ".github/workflows/postgres-runtime.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sarvex-postgres-runtime-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migration-runtime:
+    name: PostgreSQL ${{ matrix.pg }} migration runtime
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ["15", "16"]
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Bootstrap isolated Supabase auth and storage interfaces
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap-supabase.sql
+
+      - name: Apply production migration (first run)
+        run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
+
+      - name: Verify migration runtime invariants
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
+
+      - name: Verify trusted first-admin bootstrap (transaction rolled back)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/admin-bootstrap.sql
+
+      - name: Verify supplier and reseller workspace RPCs (transaction rolled back)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/supplier-workspace.sql
+
+      - name: Apply public reseller catalogue migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160001_public_reseller_catalogue.sql
+
+      - name: Verify public reseller catalogue privacy (transaction rolled back)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/public-reseller-catalogue.sql
+
+      - name: Reapply public reseller catalogue migration (idempotency check)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160001_public_reseller_catalogue.sql
+
+      - name: Apply supplier fulfilment RPC migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160002_supplier_fulfilment_rpc.sql
+
+      - name: Verify supplier acceptance and dispatch permissions (transaction rolled back)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/supplier-fulfilment.sql
+
+      - name: Reapply supplier fulfilment RPC migration (idempotency check)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160002_supplier_fulfilment_rpc.sql
+
+      - name: Apply dropship checkout reservation migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160003_dropship_checkout_reservations.sql
+
+      - name: Verify dropship checkout and stock reservation (transaction rolled back)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/dropship-checkout-reservations.sql
+
+      - name: Reapply dropship checkout reservation migration (idempotency check)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160003_dropship_checkout_reservations.sql
+
+      - name: Apply migration again (idempotency check)
+        run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
+
+      - name: Verify idempotent re-application
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
+
+      - name: Apply COD fail-closed migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160004_cod_fail_closed_gate.sql
+
+      - name: Verify COD checkout remains blocked until courier integration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/cod-fail-closed.sql
+
+      - name: Reapply COD fail-closed migration (idempotency check)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160004_cod_fail_closed_gate.sql
+
+
+  live-supabase-readonly:
+    name: Optional live Supabase REST connectivity check
+    runs-on: ubuntu-latest
+    if: ${{ vars.VITE_SUPABASE_URL != '' && vars.VITE_SUPABASE_ANON_KEY != '' }}
+    steps:
+      - name: Check configured Supabase products endpoint (read-only)
+        env:
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$SUPABASE_URL" in
+            https://*) ;;
+            *) echo "Supabase URL must use HTTPS"; exit 1 ;;
+          esac
+          code=$(curl --silent --show-error --output /tmp/sarvex-products.json --write-out "%{http_code}" \
+            --header "apikey: $SUPABASE_ANON_KEY" \
+            --header "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/products?select=id&limit=1")
+          if [ "$code" != "200" ]; then
+            echo "Supabase REST read failed with HTTP $code"
+            exit 1
+          fi
+          jq -e 'type == "array"' /tmp/sarvex-products.json >/dev/null
+          echo "Supabase REST connectivity PASS (read-only products endpoint; no rows or secrets printed)."
