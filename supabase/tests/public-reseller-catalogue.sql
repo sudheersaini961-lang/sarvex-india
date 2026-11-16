@@ -60,11 +60,11 @@ BEGIN
   PERFORM public.admin_review_reseller_listing(v_listing_id, 'active');
 
 END
-$;
+$$;
 
 -- Change database role outside a procedural block to verify anonymous access.
 SET LOCAL ROLE anon;
-DO $
+DO $$
 DECLARE
   v_result JSONB;
 BEGIN
@@ -85,7 +85,7 @@ BEGIN
     RAISE EXCEPTION 'Public catalogue leaked private supplier or financial data: %', v_result;
   END IF;
 END
-$;
+$$;
 RESET ROLE;
 
 ROLLBACK;
