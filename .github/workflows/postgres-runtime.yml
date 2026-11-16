@@ -68,6 +68,12 @@ jobs:
       - name: Verify supplier and reseller workspace RPCs (transaction rolled back)
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/supplier-workspace.sql
 
+      - name: Apply public reseller catalogue migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160001_public_reseller_catalogue.sql
+
+      - name: Verify public reseller catalogue privacy (transaction rolled back)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/public-reseller-catalogue.sql
+
       - name: Apply migration again (idempotency check)
         run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
 
