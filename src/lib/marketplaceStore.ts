@@ -262,7 +262,7 @@ export function useMarketplace() {
               badge: typeof p.badge === 'string' && p.badge ? p.badge : undefined,
               rating,
               ratingCount,
-              isCodAvailable: true,
+              isCodAvailable: false,
               isFeatured: Boolean(p.is_featured),
               createdAt: p.created_at
             }];
@@ -861,6 +861,7 @@ export function useMarketplace() {
     state: string;
     pincode: string;
   }): Promise<Order> => {
+    throw new Error('Cash on Delivery is temporarily unavailable. SARVEX must connect and verify courier PIN serviceability, COD cash collection and seller remittance before accepting orders.');
     const orderUuid = generateUuid();
     const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, '');
     const randPart = generateUuid().replace(/-/g, '').slice(0, 8).toUpperCase();
