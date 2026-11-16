@@ -126,7 +126,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="bg-blue-900/60 p-2.5 rounded-xl border border-blue-700/50">
             <span className="text-[10px] text-blue-200 uppercase font-bold block">Gross GMV</span>
             <p className="text-base font-black text-white">₹{stats.gmv.toLocaleString('en-IN')}</p>
-            <span className="text-[9px] text-emerald-300 font-medium">Cash On Delivery</span>
+            <span className="text-[9px] text-emerald-300 font-medium">Payment collection not enabled</span>
           </div>
 
           <div className="bg-blue-900/60 p-2.5 rounded-xl border border-blue-700/50">
