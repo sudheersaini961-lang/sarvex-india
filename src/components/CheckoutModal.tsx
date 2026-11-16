@@ -7,8 +7,7 @@ import {
   MapPin,
   Phone,
   User,
-  Building,
-  Check
+  Building
 } from 'lucide-react';
 import { useMarketplace } from '../lib/marketplaceStore';
 import { Order } from '../types/marketplace';
@@ -139,7 +138,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <Truck size={18} className="text-orange-400" />
               Cash on Delivery Checkout
             </h3>
-            <p className="text-[11px] text-blue-200">Doorstep Delivery • Pay When Received</p>
+            <p className="text-[11px] text-blue-200">COD setup in progress — checkout is not active</p>
           </div>
           <button
             onClick={onClose}
@@ -291,19 +290,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           </div>
 
-          {/* Payment Method Selector (COD only) */}
-          <div className="border border-emerald-200 bg-emerald-50/60 rounded-xl p-3.5 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
-                <ShieldCheck size={16} className="text-emerald-600" />
-                Payment Method: Cash on Delivery
-              </span>
-              <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center">
-                <Check size={12} strokeWidth={3} />
-              </span>
+          <div role="status" className="border border-amber-300 bg-amber-50 rounded-xl p-3.5 space-y-1.5">
+            <div className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+              <ShieldCheck size={16} /> Cash on Delivery is not active yet
             </div>
-            <p className="text-[11px] text-emerald-800 leading-normal">
-              Zero advance payment. Pay ₹{cartTotalAmount.toLocaleString('en-IN')} in cash when the order is delivered. UPI-at-delivery is not integrated yet.
+            <p className="text-[11px] text-amber-900 leading-normal">
+              Courier PIN availability, COD cash collection and seller payment reconciliation are not connected. Your order will not be submitted or charged.
             </p>
           </div>
 
@@ -336,7 +328,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isSubmitting || cart.length === 0}
+              disabled={true}
               className="w-full py-3.5 bg-gradient-to-r from-[#ea580c] to-[#f97316] hover:from-orange-600 hover:to-orange-700 text-white font-black text-sm rounded-xl shadow-lg transition tap-effect flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isSubmitting ? (
@@ -344,7 +336,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               ) : (
                 <>
                   <CheckCircle size={18} />
-                  <span>Place Cash on Delivery Order (₹{cartTotalAmount.toLocaleString('en-IN')})</span>
+                  <span>COD Checkout Not Available Yet</span>
                 </>
               )}
             </button>
