@@ -2,7 +2,7 @@
 
 SARVEX INDIA is an Indian multi-vendor marketplace web and mobile application built with React, TypeScript, Vite, Tailwind CSS, and Capacitor. It provides buyer storefront browsing, cart and checkout flows, order tracking, seller product management, and admin dashboard modules.
 
-> **Status Note:** This workspace runs with local state by default. A live Supabase database is **not** connected unless you explicitly configure your own project URL and public anon key.
+> **Honest launch status (16 Nov 2026):** This is a working development build, not a live marketplace. The app uses local state until a real Supabase project is configured. COD checkout is deliberately disabled until courier PIN serviceability, cash collection and seller remittance are integrated and verified. Dropship stock reservation is implemented and tested, but dropship order creation, payment capture and customer checkout are not enabled. See [Launch readiness](docs/LAUNCH_READINESS.md) for the exact completed work and remaining external requirements.
 
 ## Prerequisites
 
