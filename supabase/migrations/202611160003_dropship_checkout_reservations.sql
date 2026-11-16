@@ -28,7 +28,7 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth, pg_temp
-AS $
+AS $catalogue$
   SELECT COALESCE(
     jsonb_agg(
       jsonb_build_object(
@@ -61,7 +61,7 @@ AS $
     AND supplier_shop.approval_status = 'approved'
     AND st.active = true
     AND (st.available_quantity - st.reserved_quantity) >= so.minimum_order_quantity;
-$;
+$catalogue$;
 
 CREATE TABLE IF NOT EXISTS public.dropship_checkout_reservations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
