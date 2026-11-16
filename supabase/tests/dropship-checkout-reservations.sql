@@ -17,6 +17,8 @@ DECLARE
   v_reservation UUID;
   v_reserved INTEGER;
   v_blocked BOOLEAN;
+  v_public JSONB;
+  v_expired_count INTEGER;
   v_key TEXT := 'test-reservation-key-0001';
 BEGIN
   INSERT INTO auth.users (id, email, email_confirmed_at)
@@ -80,6 +82,11 @@ BEGIN
   SELECT reserved_quantity INTO v_reserved FROM public.supplier_stock WHERE id = v_stock_id;
   IF v_reserved <> 2 THEN RAISE EXCEPTION 'Expected 2 reserved units, got %', v_reserved; END IF;
 
+  v_public := public.browse_public_reseller_catalogue();
+  IF (v_public -> 0 ->> 'available_quantity')::INTEGER <> 3 THEN
+    RAISE EXCEPTION 'Public catalogue did not subtract reserved units: %', v_public;
+  END IF;
+
   -- Same customer/key/payload returns the original hold without reserving twice.
   v_result := public.create_dropship_checkout_reservation(
     jsonb_build_array(jsonb_build_object('listing_id', v_listing_id, 'quantity', 2)), v_key
@@ -118,6 +125,25 @@ BEGIN
 
   IF public.cancel_dropship_checkout_reservation(v_reservation) THEN
     RAISE EXCEPTION 'Released reservation was cancelled twice';
+  END IF;
+
+  -- Expiry worker releases stock held by an abandoned checkout.
+  v_result := public.create_dropship_checkout_reservation(
+    jsonb_build_array(jsonb_build_object('listing_id', v_listing_id, 'quantity', 1)),
+    'expiry-reservation-key-0003'
+  );
+  v_reservation := (v_result->>'reservation_id')::UUID;
+  UPDATE public.dropship_checkout_reservations
+  SET expires_at = NOW() - INTERVAL '1 minute'
+  WHERE id = v_reservation;
+  v_expired_count := public.release_expired_dropship_reservations();
+  IF v_expired_count <> 1 THEN
+    RAISE EXCEPTION 'Expiry worker did not expire exactly one reservation: %', v_expired_count;
+  END IF;
+  SELECT reserved_quantity INTO v_reserved FROM public.supplier_stock WHERE id = v_stock_id;
+  IF v_reserved <> 0 THEN RAISE EXCEPTION 'Expired reservation did not release stock'; END IF;
+  IF (SELECT status FROM public.dropship_checkout_reservations WHERE id = v_reservation) <> 'expired' THEN
+    RAISE EXCEPTION 'Expired reservation status was not recorded';
   END IF;
 END
 $$;
