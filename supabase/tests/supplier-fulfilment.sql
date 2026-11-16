@@ -94,7 +94,11 @@ BEGIN
   IF jsonb_array_length(v_result) <> 1
      OR v_result -> 0 ->> 'allocation_id' <> v_allocation_id::text
      OR v_result -> 0 ->> 'shipping_address' IS NOT NULL
-     OR v_result -> 0 ->> 'customer_phone' IS NOT NULL THEN
+     OR v_result -> 0 ->> 'customer_phone' IS NOT NULL
+     OR v_result -> 0 ->> 'city' IS NOT NULL
+     OR v_result -> 0 ->> 'state' IS NOT NULL
+     OR v_result -> 0 ->> 'pincode' IS NOT NULL
+     OR v_result -> 0 ->> 'customer_name' IS NOT NULL THEN
     RAISE EXCEPTION 'Pending supplier fulfilment read leaked address/phone or omitted allocation: %', v_result;
   END IF;
 
@@ -115,7 +119,11 @@ BEGIN
 
   v_result := public.get_my_supplier_fulfilments();
   IF v_result -> 0 ->> 'shipping_address' <> '42 Test Road'
-     OR v_result -> 0 ->> 'customer_phone' <> '9876543210' THEN
+     OR v_result -> 0 ->> 'customer_phone' <> '9876543210'
+     OR v_result -> 0 ->> 'city' <> 'Jaipur'
+     OR v_result -> 0 ->> 'state' <> 'Rajasthan'
+     OR v_result -> 0 ->> 'pincode' <> '302001'
+     OR v_result -> 0 ->> 'customer_name' <> 'Synthetic Customer' THEN
     RAISE EXCEPTION 'Accepted supplier could not access required delivery details: %', v_result;
   END IF;
 
