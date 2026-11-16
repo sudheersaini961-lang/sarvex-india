@@ -74,11 +74,15 @@ DECLARE
 BEGIN
   -- Lock affected stock rows in a stable order before changing counters.
   FOR v_stock IN
-    SELECT DISTINCT st.id
+    SELECT st.id
     FROM public.supplier_stock st
-    JOIN public.dropship_checkout_reservation_items ri ON ri.supplier_stock_id = st.id
-    JOIN public.dropship_checkout_reservations r ON r.id = ri.reservation_id
-    WHERE r.status = 'active' AND r.expires_at <= NOW()
+    WHERE EXISTS (
+      SELECT 1
+      FROM public.dropship_checkout_reservation_items ri
+      JOIN public.dropship_checkout_reservations r ON r.id = ri.reservation_id
+      WHERE ri.supplier_stock_id = st.id
+        AND r.status = 'active' AND r.expires_at <= NOW()
+    )
     ORDER BY st.id
     FOR UPDATE OF st
   LOOP
@@ -200,7 +204,7 @@ BEGIN
     v_listing_id := (v_item->>'listing_id')::UUID;
     v_qty := (v_item->>'quantity')::INTEGER;
 
-    SELECT rl.id AS listing_id, rl.reseller_shop_id, rl.retail_price_inr,
+    SELECT rl.id AS listing_id, rl.listing_status, rl.reseller_shop_id, rl.retail_price_inr,
            rs.owner_id AS reseller_owner_id, rs.approval_status AS reseller_shop_status,
            rs.commission_rate, so.id AS offer_id, so.supplier_id,
            so.wholesale_price_inr, so.minimum_order_quantity,
