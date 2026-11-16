@@ -2,7 +2,7 @@
 
 ## Status
 
-Foundation implemented on the working branch only. The repository now contains private supplier/stock/offer/reseller/allocation/event tables, authenticated supplier/reseller RPCs, a seller-side supplier workspace, and an admin review queue. This is not a live deployment and does not enable customer dropship checkout, public reseller listings, supplier order allocation, COD, or courier automation.
+Foundation and a read-only public catalogue projection implemented on the working branch only. The repository contains private supplier/stock/offer/reseller/allocation/event tables, authenticated supplier/reseller RPCs, a seller-side supplier workspace, an admin review queue, and an anonymous-safe retail-only catalogue RPC. This is not a live deployment and does not enable customer dropship checkout, supplier order allocation, COD, or courier automation.
 
 ## Business roles
 
@@ -77,7 +77,7 @@ Extend the existing strict policy-verification and smoke-test framework delibera
 
 ## Current limitations
 
-The existing customer checkout still supports only seller-owned products and the current COD order RPC. The supplier foundation now models supplier profiles, private stock, wholesale offers, reseller listings, supplier order allocations, and fulfilment event records. Authenticated RPCs support supplier application, supplier stock entry, offer submission, reseller listing submission, admin approval, and scoped workspace/discovery reads. The Seller Portal has supplier/reseller forms and the Admin Dashboard has review queues. These records remain private and are not joined into the customer catalogue or checkout. No supplier order allocation is created at purchase time; no customer-facing dropship order, supplier acceptance workflow, payment split, courier booking, live tracking, COD remittance, or returns automation is implemented.
+The existing customer checkout still supports only seller-owned products and the current COD order RPC. The supplier foundation now models supplier profiles, private stock, wholesale offers, reseller listings, supplier order allocations, and fulfilment event records. Authenticated RPCs support supplier application, supplier stock entry, offer submission, reseller listing submission, admin approval, and scoped workspace/discovery reads. The Seller Portal has supplier/reseller forms and the Admin Dashboard has review queues. An incremental migration adds `browse_public_reseller_catalogue()`, which returns only approved retail-facing fields for active listings with approved supplier/reseller shops, active direct-dispatch offers, active stock, and sufficient quantity. Its anonymous-access test asserts wholesale cost, supplier contact/address, supplier IDs, and reseller margin are absent. The catalogue remains a read-only projection; it does not provide cart, checkout, reservation, payment, or fulfilment.e not joined into the customer catalogue or checkout. No supplier order allocation is created at purchase time; no customer-facing dropship order, supplier acceptance workflow, payment split, courier booking, live tracking, COD remittance, or returns automation is implemented.
 
 ## External marketplace links and delivery automation
 
