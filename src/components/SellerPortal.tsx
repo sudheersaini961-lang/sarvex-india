@@ -61,6 +61,9 @@ export const SellerPortal: React.FC = () => {
   const [actionError, setActionError] = useState('');
   const [supplierWorkspace, setSupplierWorkspace] = useState<any>(null);
   const [supplierOffers, setSupplierOffers] = useState<any[]>([]);
+  const [supplierFulfilments, setSupplierFulfilments] = useState<any[]>([]);
+  const [fulfilmentCourierById, setFulfilmentCourierById] = useState<Record<string, string>>({});
+  const [fulfilmentTrackingById, setFulfilmentTrackingById] = useState<Record<string, string>>({});
   const [supplierLoading, setSupplierLoading] = useState(false);
   const [supplierError, setSupplierError] = useState('');
   const [supplierNotice, setSupplierNotice] = useState('');
@@ -97,9 +100,10 @@ export const SellerPortal: React.FC = () => {
         }
         return;
       }
-      const [workspaceResult, offersResult] = await Promise.all([
+      const [workspaceResult, offersResult, fulfilmentsResult] = await Promise.all([
         supabase.rpc('get_my_supplier_workspace'),
-        supabase.rpc('browse_supplier_offers')
+        supabase.rpc('browse_supplier_offers'),
+        supabase.rpc('get_my_supplier_fulfilments')
       ]);
       if (!alive) return;
       if (workspaceResult.error) setSupplierError(workspaceResult.error.message);
@@ -111,6 +115,8 @@ export const SellerPortal: React.FC = () => {
       } else {
         setSupplierOffers(Array.isArray(offersResult.data) ? offersResult.data : []);
       }
+      if (fulfilmentsResult.error) setSupplierError((current) => current || fulfilmentsResult.error.message);
+      else setSupplierFulfilments(Array.isArray(fulfilmentsResult.data) ? fulfilmentsResult.data : []);
       setSupplierLoading(false);
     };
     void loadWorkspace();
@@ -128,13 +134,46 @@ export const SellerPortal: React.FC = () => {
   const refreshSupplierWorkspace = async () => {
     const supabase = getSupabase();
     if (!supabase) return;
-    const [workspaceResult, offersResult] = await Promise.all([
+    const [workspaceResult, offersResult, fulfilmentsResult] = await Promise.all([
       supabase.rpc('get_my_supplier_workspace'),
-      supabase.rpc('browse_supplier_offers')
+      supabase.rpc('browse_supplier_offers'),
+      supabase.rpc('get_my_supplier_fulfilments')
     ]);
     if (workspaceResult.error) throw workspaceResult.error;
+    if (fulfilmentsResult.error) throw fulfilmentsResult.error;
     setSupplierWorkspace(workspaceResult.data || null);
     setSupplierOffers(offersResult.error || !Array.isArray(offersResult.data) ? [] : offersResult.data);
+    setSupplierFulfilments(Array.isArray(fulfilmentsResult.data) ? fulfilmentsResult.data : []);
+  };
+
+  const handleSupplierFulfilmentAction = async (
+    allocationId: string,
+    action: 'accept' | 'reject' | 'packed' | 'shipped'
+  ) => {
+    setSupplierError('');
+    setSupplierNotice('');
+    try {
+      const result = await callSupplierRpc('supplier_update_fulfilment', {
+        p_allocation_id: allocationId,
+        p_action: action,
+        p_courier_provider: action === 'shipped' ? (fulfilmentCourierById[allocationId] || '').trim() : null,
+        p_tracking_reference: action === 'shipped' ? (fulfilmentTrackingById[allocationId] || '').trim() : null,
+        p_event_note: null
+      });
+      const labels: Record<string, string> = {
+        accept: 'Supplier ne order accept kar diya.',
+        reject: 'Order reject hua; admin resolution abhi zaroori hai.',
+        packed: 'Order packed mark hua.',
+        shipped: 'Supplier ne dispatch details submit ki. Tracking courier se verify nahi hui hai.'
+      };
+      setSupplierNotice(labels[action]);
+      await refreshSupplierWorkspace();
+      if (action === 'shipped' && result?.tracking_reference) {
+        setFulfilmentTrackingById((current) => ({ ...current, [allocationId]: result.tracking_reference }));
+      }
+    } catch (error) {
+      setSupplierError(error instanceof Error ? error.message : 'Supplier fulfilment update nahi hua.');
+    }
   };
 
   const handleSupplierApplication = async (e: React.FormEvent) => {
@@ -763,6 +802,53 @@ export const SellerPortal: React.FC = () => {
                 </div>
                 <button disabled={supplierLoading} className="w-full rounded-lg bg-[#1e3a8a] p-3 text-xs font-bold text-white">Submit Supplier Application</button>
               </form>
+            )}
+            {supplierWorkspace?.supplier_profile?.approval_status === 'approved' && (
+              <section className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900">Supplier Orders & Dispatch</h3>
+                  <p className="mt-1 text-[11px] text-gray-500">Sirf aapke supplier account ko assigned orders yahan dikhenge. Courier/tracking supplier-entered hai; courier provider se verify nahi hota.</p>
+                </div>
+                {supplierFulfilments.length === 0 ? (
+                  <p className="rounded-lg bg-gray-50 p-3 text-xs text-gray-500">Abhi koi supplier order allocation nahi hai. Dropship checkout aur order allocation abhi enable nahi hain.</p>
+                ) : supplierFulfilments.map((item: any) => (
+                  <article key={item.allocation_id} className="rounded-lg border border-gray-200 p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-gray-900">{item.product_name}</p>
+                        <p className="text-[10px] text-gray-500">Order {item.order_code} · Qty {item.quantity}</p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-800">{String(item.allocation_status).replaceAll('_', ' ')}</span>
+                    </div>
+                    <p className="text-[11px] text-gray-600">Delivery area: {item.city}, {item.state} · PIN {item.pincode}</p>
+                    {item.shipping_address && (
+                      <div className="rounded-md bg-gray-50 p-2 text-[11px] text-gray-700">
+                        <p>{item.customer_name} · {item.customer_phone}</p>
+                        <p>{item.shipping_address}</p>
+                      </div>
+                    )}
+                    {item.allocation_status === 'awaiting_supplier' && (
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => void handleSupplierFulfilmentAction(item.allocation_id, 'accept')} className="flex-1 rounded-lg bg-[#1e3a8a] p-2 text-xs font-bold text-white">Accept Order</button>
+                        <button type="button" onClick={() => void handleSupplierFulfilmentAction(item.allocation_id, 'reject')} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700">Reject</button>
+                      </div>
+                    )}
+                    {item.allocation_status === 'accepted' && (
+                      <button type="button" onClick={() => void handleSupplierFulfilmentAction(item.allocation_id, 'packed')} className="w-full rounded-lg bg-[#1e3a8a] p-2 text-xs font-bold text-white">Mark Packed</button>
+                    )}
+                    {['accepted', 'dispatch_pending'].includes(item.allocation_status) && (
+                      <div className="space-y-2 rounded-md bg-gray-50 p-2">
+                        <input value={fulfilmentCourierById[item.allocation_id] || ''} onChange={(e) => setFulfilmentCourierById((current) => ({ ...current, [item.allocation_id]: e.target.value }))} maxLength={80} placeholder="Courier name (supplier-entered)" className="w-full rounded-md border bg-white p-2 text-xs" />
+                        <input value={fulfilmentTrackingById[item.allocation_id] || ''} onChange={(e) => setFulfilmentTrackingById((current) => ({ ...current, [item.allocation_id]: e.target.value }))} maxLength={120} placeholder="Tracking / AWB reference" className="w-full rounded-md border bg-white p-2 text-xs" />
+                        <button type="button" onClick={() => void handleSupplierFulfilmentAction(item.allocation_id, 'shipped')} className="w-full rounded-lg bg-[#f97316] p-2 text-xs font-bold text-white">Mark Shipped</button>
+                      </div>
+                    )}
+                    {item.latest_fulfilment_event?.tracking_reference && (
+                      <p className="text-[10px] text-gray-500">Tracking: {item.latest_fulfilment_event.tracking_reference} · Supplier reported, not courier verified</p>
+                    )}
+                  </article>
+                ))}
+              </section>
             )}
             {supplierWorkspace?.supplier_profile && (
               <div className="rounded-xl border border-gray-200 bg-white p-3">
