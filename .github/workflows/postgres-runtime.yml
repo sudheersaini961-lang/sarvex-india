@@ -7,6 +7,7 @@ on:
       - fix/public-seller-sync-security
     paths:
       - "supabase-production-migration.sql"
+      - "supabase/migrations/**"
       - "supabase/tests/**"
       - ".github/workflows/postgres-runtime.yml"
 
