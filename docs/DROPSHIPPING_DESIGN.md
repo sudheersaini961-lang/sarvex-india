@@ -1,5 +1,19 @@
 # SARVEX Supplier and Dropshipping Design
 
+## Checkout and stock reservation foundation (working branch)
+
+The incremental migration `202611160003_dropship_checkout_reservations.sql` adds a temporary reservation stage, not a paid order flow:
+
+- `supplier_stock.reserved_quantity` tracks held units separately from physical `available_quantity`; available-to-reserve is their difference.
+- `create_dropship_checkout_reservation(items, idempotency_key)` accepts 1–20 listing lines, validates current reseller/supplier/offer/listing approvals and direct-dispatch eligibility on the server, locks stock rows in stable order, checks MOQ and quantity, snapshots retail price, supplier wholesale cost, configured reseller-shop commission, supplier payable and reseller margin, then reserves units for 15 minutes.
+- Client input contains only listing IDs, quantities and an idempotency key. It cannot submit price, supplier identity, wholesale cost, commission, margin or payable amounts.
+- The idempotency key is bound to a SHA-256 request fingerprint. Replays return the original reservation; changed payload reuse is rejected.
+- `cancel_dropship_checkout_reservation` releases an active customer's own hold. `release_expired_dropship_reservations` releases expired holds and is service-role-only.
+- Reservation tables have RLS enabled and no browser table grants. Only narrow SECURITY DEFINER RPCs are callable.
+- The response explicitly reports `payment_verified=false`, `order_created=false`, and `cod_available=false`.
+
+**Not yet enabled:** this migration does not create a customer order, capture or verify payment, convert reservations into supplier allocations, or expose a customer-facing checkout UI. A trusted payment-provider callback, conversion transaction, failure/timeout reconciliation, and scheduled expiry invocation are still required. COD remains disabled. Do not apply to live Supabase until migration and PG15/16 tests pass and deployment is separately approved.
+
 ## Status
 
 Foundation and a read-only public catalogue projection implemented on the working branch only. The repository contains private supplier/stock/offer/reseller/allocation/event tables, authenticated supplier/reseller/fulfilment RPCs, a seller-side supplier workspace with acceptance and manual dispatch controls, an admin review queue, and an anonymous-safe retail-only catalogue RPC. This is not a live deployment and does not enable customer dropship checkout, supplier order allocation, COD, or courier automation.
