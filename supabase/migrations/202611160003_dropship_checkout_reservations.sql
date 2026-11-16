@@ -360,10 +360,11 @@ DECLARE
   v_item RECORD;
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'Authentication required'; END IF;
-  SELECT * INTO v_res
+  -- Read ownership first without locking. Stock rows are always locked before
+  -- reservation headers in both cancellation and expiry to avoid lock inversion.
+  SELECT id, status INTO v_res
   FROM public.dropship_checkout_reservations
-  WHERE id = p_reservation_id AND customer_id = v_uid
-  FOR UPDATE;
+  WHERE id = p_reservation_id AND customer_id = v_uid;
   IF NOT FOUND THEN RAISE EXCEPTION 'Reservation not found'; END IF;
   IF v_res.status <> 'active' THEN RETURN FALSE; END IF;
 
@@ -379,6 +380,14 @@ BEGIN
     WHERE id = v_item.supplier_stock_id AND reserved_quantity >= v_item.qty;
     IF NOT FOUND THEN RAISE EXCEPTION 'Reservation stock counter invariant failed'; END IF;
   END LOOP;
+
+  SELECT status INTO v_res
+  FROM public.dropship_checkout_reservations
+  WHERE id = p_reservation_id AND customer_id = v_uid
+  FOR UPDATE;
+  IF NOT FOUND OR v_res.status <> 'active' THEN
+    RAISE EXCEPTION 'Reservation is no longer active';
+  END IF;
 
   UPDATE public.dropship_checkout_reservations
   SET status = 'released', updated_at = NOW()
