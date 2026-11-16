@@ -1089,7 +1089,7 @@ export function useMarketplace() {
       id: shopUuid,
       userId: ownerId,
       status: 'pending',
-      commissionRate: 10,
+      commissionRate: 0,
       rating: 0,
       createdAt: new Date().toISOString()
     };
