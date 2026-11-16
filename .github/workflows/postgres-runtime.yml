@@ -110,6 +110,15 @@ jobs:
 
       - name: Reapply COD fail-closed migration (idempotency check)
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160004_cod_fail_closed_gate.sql
+      
+      - name: Apply zero-commission launch policy
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160005_zero_commission_launch_policy.sql
+
+      - name: Verify zero-commission seller policy
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/zero-commission-launch-policy.sql
+
+      - name: Reapply zero-commission launch policy (idempotency check)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160005_zero_commission_launch_policy.sql
 
   live-supabase-readonly:
     name: Optional live Supabase REST connectivity check
