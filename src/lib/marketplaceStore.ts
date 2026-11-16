@@ -102,6 +102,8 @@ function getCheckoutIdempotencyKey(payload: Record<string, unknown>): string {
   return generateUuid();
 }
 
+const isCodCheckoutEnabled = (): boolean => false;
+
 function clearCheckoutIdempotencyKey(): void {
   if (typeof window !== 'undefined') {
     try { localStorage.removeItem('sarvex_pending_checkout_v1'); } catch { /* storage may be disabled */ }
@@ -861,7 +863,9 @@ export function useMarketplace() {
     state: string;
     pincode: string;
   }): Promise<Order> => {
-    throw new Error('Cash on Delivery is temporarily unavailable. SARVEX must connect and verify courier PIN serviceability, COD cash collection and seller remittance before accepting orders.');
+    if (!isCodCheckoutEnabled()) {
+      throw new Error('Cash on Delivery is temporarily unavailable. SARVEX must connect and verify courier PIN serviceability, COD cash collection and seller remittance before accepting orders.');
+    }
     const orderUuid = generateUuid();
     const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, '');
     const randPart = generateUuid().replace(/-/g, '').slice(0, 8).toUpperCase();
