@@ -59,10 +59,15 @@ BEGIN
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
   PERFORM public.admin_review_reseller_listing(v_listing_id, 'active');
 
-  -- Anonymous callers can execute the public RPC, but only see approved
-  -- customer-facing retail fields. No supplier identity or private economics.
-  PERFORM set_config('request.jwt.claim.sub', '', true);
-  SET LOCAL ROLE anon;
+END
+$;
+
+-- Change database role outside a procedural block to verify anonymous access.
+SET LOCAL ROLE anon;
+DO $
+DECLARE
+  v_result JSONB;
+BEGIN
   v_result := public.browse_public_reseller_catalogue();
   IF jsonb_array_length(v_result) <> 1 THEN
     RAISE EXCEPTION 'Expected exactly one approved public reseller listing: %', v_result;
@@ -79,8 +84,8 @@ BEGIN
   ] THEN
     RAISE EXCEPTION 'Public catalogue leaked private supplier or financial data: %', v_result;
   END IF;
-  RESET ROLE;
 END
-$$;
+$;
+RESET ROLE;
 
 ROLLBACK;
