@@ -818,7 +818,7 @@ export const SellerPortal: React.FC = () => {
                         <p className="text-xs font-bold text-gray-900">{item.product_name}</p>
                         <p className="text-[10px] text-gray-500">Order {item.order_code} · Qty {item.quantity}</p>
                       </div>
-                      <span className="shrink-0 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-800">{String(item.allocation_status).replaceAll('_', ' ')}</span>
+                      <span className="shrink-0 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-800">{String(item.allocation_status).replace(/_/g, ' ')}</span>
                     </div>
                     <p className="text-[11px] text-gray-600">Delivery area: {item.city}, {item.state} · PIN {item.pincode}</p>
                     {item.shipping_address && (
