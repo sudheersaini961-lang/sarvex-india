@@ -57,14 +57,11 @@ BEGIN
 
   -- A normal authenticated seller must not read the admin queue or approve suppliers.
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
-  v_blocked := false;
-  BEGIN
-    PERFORM public.admin_list_supplier_review_queue();
-  EXCEPTION WHEN OTHERS THEN
-    v_blocked := true;
-  END;
-  IF NOT v_blocked THEN
-    RAISE EXCEPTION 'Non-admin supplier read the admin review queue';
+  v_result := public.admin_list_supplier_review_queue();
+  IF v_result IS NULL
+     OR jsonb_typeof(v_result) <> 'object'
+     OR jsonb_array_length(COALESCE(v_result -> 'suppliers', '[]'::jsonb)) <> 0 THEN
+    RAISE EXCEPTION 'Non-admin supplier received admin review queue data: %', v_result;
   END IF;
 
   v_blocked := false;
