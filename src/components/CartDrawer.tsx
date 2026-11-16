@@ -6,8 +6,7 @@ import {
   Trash2,
   ShoppingBag,
   ShieldCheck,
-  Truck,
-  ArrowRight
+  
 } from 'lucide-react';
 import { useMarketplace } from '../lib/marketplaceStore';
 
@@ -20,7 +19,7 @@ interface CartDrawerProps {
 export const CartDrawer: React.FC<CartDrawerProps> = ({
   isOpen,
   onClose,
-  onProceedToCheckout,
+  
 }) => {
   const {
     cart,
