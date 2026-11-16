@@ -6,6 +6,9 @@ BEGIN;
 ALTER TABLE public.supplier_stock
   ADD COLUMN IF NOT EXISTS reserved_quantity INTEGER NOT NULL DEFAULT 0;
 
+-- SARVEX launch policy: seller commission remains 0%; customer fees are separate.
+ALTER TABLE public.seller_shops ALTER COLUMN commission_rate SET DEFAULT 0.00;
+
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -283,7 +286,7 @@ BEGIN
       RAISE EXCEPTION 'Insufficient available supplier stock';
     END IF;
 
-    v_fee := round((v_listing.retail_price_inr * v_qty) * (COALESCE(v_listing.commission_rate, 10.0) / 100.0), 2);
+    v_fee := round((v_listing.retail_price_inr * v_qty) * (COALESCE(v_listing.commission_rate, 0.0) / 100.0), 2);
     v_cost := round(v_listing.wholesale_price_inr * v_qty, 2);
     v_margin := round((v_listing.retail_price_inr * v_qty) - v_cost - v_fee, 2);
     IF v_margin < 0 THEN
@@ -313,7 +316,7 @@ BEGIN
     JOIN public.supplier_stock st ON st.id = so.supplier_stock_id
     WHERE rl.id = v_listing_id;
 
-    v_fee := round(v_listing.retail_price_inr * v_qty * (COALESCE(v_listing.commission_rate, 10.0) / 100.0), 2);
+    v_fee := round(v_listing.retail_price_inr * v_qty * (COALESCE(v_listing.commission_rate, 0.0) / 100.0), 2);
     v_cost := round(v_listing.wholesale_price_inr * v_qty, 2);
     v_margin := round(v_listing.retail_price_inr * v_qty - v_cost - v_fee, 2);
 
@@ -324,7 +327,7 @@ BEGIN
     ) VALUES (
       v_reservation_id, v_listing_id, v_listing.stock_id, v_qty,
       v_listing.retail_price_inr, v_listing.wholesale_price_inr,
-      COALESCE(v_listing.commission_rate, 10.0), v_fee, v_cost, v_margin
+      COALESCE(v_listing.commission_rate, 0.0), v_fee, v_cost, v_margin
     );
 
     UPDATE public.supplier_stock
