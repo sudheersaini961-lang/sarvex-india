@@ -87,6 +87,15 @@ jobs:
       - name: Reapply supplier fulfilment RPC migration (idempotency check)
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160002_supplier_fulfilment_rpc.sql
 
+      - name: Apply dropship checkout reservation migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160003_dropship_checkout_reservations.sql
+
+      - name: Verify dropship checkout and stock reservation (transaction rolled back)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/dropship-checkout-reservations.sql
+
+      - name: Reapply dropship checkout reservation migration (idempotency check)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160003_dropship_checkout_reservations.sql
+
       - name: Apply migration again (idempotency check)
         run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
 
