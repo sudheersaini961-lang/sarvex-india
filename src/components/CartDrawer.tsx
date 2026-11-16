@@ -62,7 +62,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         </div>
 
         <div className="bg-amber-50 px-4 py-2 border-b border-amber-100 text-xs text-amber-900 font-medium">
-          COD is the current checkout method. Delivery availability and shipping charges are not verified in the app yet.
+          COD checkout is temporarily disabled. Courier PIN serviceability and COD cash reconciliation are not connected yet.
         </div>
 
         {/* Cart items list or empty state */}
@@ -74,7 +74,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               </div>
               <h4 className="font-bold text-gray-800 text-base mb-1">Your Cart is Empty</h4>
               <p className="text-xs text-gray-500 mb-4 max-w-xs mx-auto">
-                Discover trending ethnic wear, smart gadgets, and natural Indian products at ₹0 extra fee.
+                Your cart is saved while SARVEX completes secure delivery and payment setup.
               </p>
               <button
                 onClick={onClose}
@@ -200,7 +200,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               <div className="flex items-center gap-2 p-2.5 bg-blue-50/70 rounded-xl border border-blue-100 text-xs text-[#1e3a8a]">
                 <ShieldCheck size={18} className="shrink-0 text-[#f97316]" />
                 <span className="text-[11px]">
-                  COD is the current checkout payment method. Delivery and parcel-opening services are not integrated yet.
+                  COD is disabled until courier collection, PIN serviceability and seller remittance are connected and tested.
                 </span>
               </div>
             </>
@@ -218,19 +218,15 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </p>
               </div>
               <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">
-                Cash On Delivery
+                COD setup pending
               </span>
             </div>
 
             <button
-              onClick={() => {
-                onClose();
-                onProceedToCheckout();
-              }}
-              className="w-full py-3 bg-[#f97316] hover:bg-orange-600 text-white font-extrabold text-sm rounded-xl shadow-lg transition tap-effect flex items-center justify-center gap-2"
+              disabled
+              className="w-full py-3 bg-gray-400 text-white font-extrabold text-sm rounded-xl shadow flex items-center justify-center gap-2 cursor-not-allowed"
             >
-              <span>Proceed to Cash on Delivery Checkout</span>
-              <ArrowRight size={16} />
+              <span>COD Checkout Not Available Yet</span>
             </button>
           </div>
         )}
