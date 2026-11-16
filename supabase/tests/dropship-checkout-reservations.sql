@@ -100,7 +100,7 @@ BEGIN
   v_blocked := false;
   BEGIN
     PERFORM public.create_dropship_checkout_reservation(
-      jsonb_build_array(jsonb_build_object('listing_id', v_listing_id, 'quantity', 2)),
+      jsonb_build_array(jsonb_build_object('listing_id', v_listing_id, 'quantity', 4)),
       'different-reservation-key-0002'
     );
   EXCEPTION WHEN OTHERS THEN v_blocked := true;
