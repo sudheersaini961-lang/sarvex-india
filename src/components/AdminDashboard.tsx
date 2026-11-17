@@ -170,7 +170,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {pendingSellers.length === 0 ? (
           <div className="p-4 bg-emerald-50 rounded-lg text-emerald-800 text-xs font-medium flex items-center gap-2">
             <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-            <span>All seller onboarding applications have been reviewed. No pending queues!</span>
+            <span>No pending applications are currently visible. Verify the live database connection and review queue before treating onboarding as complete.</span>
           </div>
         ) : (
           <div className="space-y-2.5">
