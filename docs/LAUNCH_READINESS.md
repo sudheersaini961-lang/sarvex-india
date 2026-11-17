@@ -17,6 +17,7 @@ This document separates implemented and tested code from external integrations a
 - Supplier fulfilment controls for accept/reject, pack and supplier-reported dispatch/tracking. Tracking is not courier-verified.
 - Public reseller catalogue RPC exposes retail fields only and excludes supplier wholesale cost and reseller margin.
 - Dropship stock reservations are atomic, idempotent, expire after 15 minutes and release stock on cancellation/expiry. They do not create an order.
+- A service-role-only dropship payment confirmation ledger records webhook events only after an external server verifies the provider signature; it checks INR amount against the reservation, rejects conflicting payment-ID replays, and quarantines amount/state mismatches. It does not create an order or issue refunds.
 - COD checkout is fail-closed for public clients. UI and store both block COD until required courier/payment operations exist.
 - Seller/platform commission launch policy is 0%. The migration resets seller shop commission rates to 0%, enforces the constraint and preserves historical order-item snapshots.
 - PostgreSQL 15 and 16 runtime migrations/tests, TypeScript/production web build, branch validation and Android debug APK workflow have passed for the latest verified code revision.
@@ -27,7 +28,7 @@ This document separates implemented and tested code from external integrations a
 2. **Customer checkout:** Direct-seller COD is disabled. No alternative online payment provider is configured.
 3. **Courier operations:** No courier account/API is connected. PIN-code serviceability, rate quotes, pickup booking, AWB generation, courier event tracking, COD cash collection and remittance are not verified.
 4. **Seller settlement:** No live COD/payment reconciliation or automated seller payout exists.
-5. **Dropship checkout:** No payment-confirmed reservation conversion, supplier allocation creation, customer order, COD or customer checkout UI exists.
+5. **Dropship checkout:** A server-only payment-event recording boundary now exists, but no payment provider/webhook verifier is connected. No payment-confirmed reservation conversion, supplier allocation creation, customer order, COD or customer checkout UI exists. Verified events remain pending conversion; mismatched/late events require manual review and must be reconciled/refunded before stock is released.
 6. **Returns/refunds:** A complete customer return, refund, failed-delivery/RTO and seller liability workflow is not live.
 7. **Store release:** The CI artifact is a debug APK. A signed release build requires a user-controlled signing key and release configuration.
 
