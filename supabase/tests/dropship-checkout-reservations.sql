@@ -127,6 +127,82 @@ BEGIN
     RAISE EXCEPTION 'Released reservation was cancelled twice';
   END IF;
 
+  -- A browser-authenticated customer cannot forge a verified payment webhook.
+  v_result := public.create_dropship_checkout_reservation(
+    jsonb_build_array(jsonb_build_object('listing_id', v_listing_id, 'quantity', 1)),
+    'payment-confirmation-key-0004'
+  );
+  v_reservation := (v_result->>'reservation_id')::UUID;
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+  v_blocked := false;
+  BEGIN
+    PERFORM public.record_verified_dropship_payment(
+      v_reservation, 'testpay', 'provider-order-001', 'provider-payment-001', 150, 'INR'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN v_blocked := true;
+  END;
+  IF NOT v_blocked THEN RAISE EXCEPTION 'Authenticated customer forged a verified payment event'; END IF;
+
+  -- Only the trusted service role may record a webhook after signature verification upstream.
+  PERFORM set_config('request.jwt.claim.role', 'service_role', true);
+  v_result := public.record_verified_dropship_payment(
+    v_reservation, 'testpay', 'provider-order-001', 'provider-payment-001', 150, 'INR'
+  );
+  IF v_result->>'status' <> 'verified_pending_order'
+     OR v_result->>'order_created' <> 'false'
+     OR (v_result->>'expected_amount_inr')::NUMERIC <> 150 THEN
+    RAISE EXCEPTION 'Valid payment confirmation was not safely recorded: %', v_result;
+  END IF;
+
+  -- Exact webhook replay is idempotent; it must not create a second payment event.
+  v_result := public.record_verified_dropship_payment(
+    v_reservation, 'testpay', 'provider-order-001', 'provider-payment-001', 150, 'INR'
+  );
+  IF v_result->>'replayed' <> 'true'
+     OR (SELECT COUNT(*) FROM public.dropship_payment_confirmations
+         WHERE provider = 'testpay' AND provider_payment_id = 'provider-payment-001') <> 1 THEN
+    RAISE EXCEPTION 'Verified payment webhook replay was not idempotent';
+  END IF;
+
+  -- A verified payment keeps stock reserved beyond the original 15-minute hold.
+  UPDATE public.dropship_checkout_reservations
+  SET expires_at = NOW() - INTERVAL '1 minute'
+  WHERE id = v_reservation;
+  v_expired_count := public.release_expired_dropship_reservations();
+  IF v_expired_count <> 0 THEN
+    RAISE EXCEPTION 'Expiry worker released a reservation with a verified payment';
+  END IF;
+  SELECT reserved_quantity INTO v_reserved FROM public.supplier_stock WHERE id = v_stock_id;
+  IF v_reserved <> 1 THEN RAISE EXCEPTION 'Verified payment reservation stock was released'; END IF;
+
+  -- Amount mismatch is recorded for manual review, never treated as paid/ready.
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+  v_result := public.create_dropship_checkout_reservation(
+    jsonb_build_array(jsonb_build_object('listing_id', v_listing_id, 'quantity', 1)),
+    'payment-review-key-0005'
+  );
+  v_reservation := (v_result->>'reservation_id')::UUID;
+  PERFORM set_config('request.jwt.claim.role', 'service_role', true);
+  v_result := public.record_verified_dropship_payment(
+    v_reservation, 'testpay', 'provider-order-002', 'provider-payment-002', 149, 'INR'
+  );
+  IF v_result->>'status' <> 'review_required'
+     OR (SELECT status FROM public.dropship_checkout_reservations WHERE id = v_reservation) <> 'payment_review' THEN
+    RAISE EXCEPTION 'Mismatched payment amount was not quarantined for manual review: %', v_result;
+  END IF;
+
+  -- Reusing a provider payment ID for a different reservation/payload is rejected.
+  v_blocked := false;
+  BEGIN
+    PERFORM public.record_verified_dropship_payment(
+      v_reservation, 'testpay', 'different-order', 'provider-payment-001', 150, 'INR'
+    );
+  EXCEPTION WHEN unique_violation THEN v_blocked := true;
+  END;
+  IF NOT v_blocked THEN RAISE EXCEPTION 'Conflicting provider payment replay was accepted'; END IF;
+
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+
   -- Expiry worker releases stock held by an abandoned checkout.
   v_result := public.create_dropship_checkout_reservation(
     jsonb_build_array(jsonb_build_object('listing_id', v_listing_id, 'quantity', 1)),
