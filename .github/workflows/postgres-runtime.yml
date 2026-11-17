@@ -1,6 +1,7 @@
 name: SARVEX PostgreSQL Runtime Tests
 
 on:
+  # Manual dispatch is retained for rerunning both PostgreSQL major-version suites after test-only changes.
   workflow_dispatch:
   push:
     branches:
