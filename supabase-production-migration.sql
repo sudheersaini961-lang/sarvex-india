@@ -244,9 +244,29 @@ BEGIN
     ) INTO v_is_approved;
 
     IF v_is_approved THEN
-      -- Exact approved managed SARVEX policy: drop cleanly so Section 15 can idempotently recreate latest definition
+      -- Exact approved managed SARVEX policy: refresh from the definitions below.
       EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', pol.policyname, pol.schemaname, pol.tablename);
       RAISE NOTICE 'Verified and dropped approved managed policy "%" on %.% for refresh', pol.policyname, pol.schemaname, pol.tablename;
+    ELSIF pol.schemaname = 'public'
+      AND pol.roles::text[] = ARRAY['public']
+      AND pol.tablename IN ('customer_profiles','seller_shops','products','cart_items')
+      AND pol.policyname IN (
+        'customer_profiles_create_policy','customer_profiles_read_policy','customer_profiles_update_policy','customer_profiles_delete_policy',
+        'seller_shops_create_policy','seller_shops_read_policy','seller_shops_update_policy','seller_shops_delete_policy',
+        'products_create_policy','products_read_policy','products_update_policy','products_delete_policy',
+        'cart_items_create_policy','cart_items_read_policy','cart_items_update_policy','cart_items_delete_policy'
+      )
+      AND (
+        (pol.policyname LIKE '%_create_policy' AND pol.cmd = 'INSERT')
+        OR (pol.policyname LIKE '%_read_policy' AND pol.cmd = 'SELECT')
+        OR (pol.policyname LIKE '%_update_policy' AND pol.cmd = 'UPDATE')
+        OR (pol.policyname LIKE '%_delete_policy' AND pol.cmd = 'DELETE')
+      )
+    THEN
+      -- These exact legacy policy names are always replaced by the hardened policies below.
+      -- Unknown policy names and any detected disjunctive bypass still fail closed.
+      EXECUTE format('DROP POLICY IF EXISTS %I ON %I.%I', pol.policyname, pol.schemaname, pol.tablename);
+      RAISE NOTICE 'Removed known legacy policy "%" on %.%', pol.policyname, pol.schemaname, pol.tablename;
     ELSE
       -- Unknown, generic legacy (e.g. "Public Access", "Allow all"), or mismatched permissive policy: FAIL CLOSED
       RAISE EXCEPTION 'SARVEX SECURITY VIOLATION: Unrecognized or mismatched PERMISSIVE policy "%" (cmd: %, roles: %, qual: %, with_check: %) on table "%.%". Aborting migration to prevent RLS bypass. Remove or convert to RESTRICTIVE before running migration.',
