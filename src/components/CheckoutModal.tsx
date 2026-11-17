@@ -75,7 +75,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setErrorMsg('');
 
     if (!currentUser) {
-      setErrorMsg('Authentication required: Please log in or create an account to place a Cash on Delivery order.');
+      setErrorMsg('Checkout is not available yet. No order has been submitted.');
       if (onOpenAuth) {
         onOpenAuth();
       }
@@ -136,7 +136,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div>
             <h3 className="font-bold text-base flex items-center gap-1.5">
               <Truck size={18} className="text-orange-400" />
-              Cash on Delivery Checkout
+              Checkout setup pending
             </h3>
             <p className="text-[11px] text-blue-200">COD setup in progress — checkout is not active</p>
           </div>
@@ -161,7 +161,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-amber-900 flex items-center gap-1.5">
-                  <ShieldCheck size={16} className="text-[#f97316]" /> Login Required for COD
+                  <ShieldCheck size={16} className="text-[#f97316]" /> Account sign-in (when checkout is enabled)
                 </span>
                 {onOpenAuth && (
                   <button
@@ -174,7 +174,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 )}
               </div>
               <p className="text-[11px] text-amber-800 leading-tight">
-                To prevent fraudulent dispatches, Cash on Delivery orders require verified customer authentication.
+                Customer sign-in will be required when a supported payment and delivery flow is configured.
               </p>
             </div>
           )}
