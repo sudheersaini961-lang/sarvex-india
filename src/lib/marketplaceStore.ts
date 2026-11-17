@@ -190,11 +190,14 @@ export function useMarketplace() {
         const { data: publicSellers, error: publicSellersError } = await supabase
           .from('sellers')
           .select('id, user_id, store_name, owner_name, city, state, pincode, status, rating, created_at');
-        if (publicSellersError) throw publicSellersError;
+        if (publicSellersError) console.warn('Public seller catalogue could not be loaded:', publicSellersError.message);
         if (runId !== syncGeneration) return;
 
         const shopNameMap: Record<string, string> = {};
-        globalState.sellers = (publicSellers || []).map((s: any): Seller => {
+        if (publicSellersError) {
+          globalState.sellers = [...publicSellerSnapshot];
+        } else {
+          globalState.sellers = (publicSellers || []).map((s: any): Seller => {
           const storeName = s.store_name || '';
           shopNameMap[s.id] = storeName;
           return {
@@ -214,14 +217,18 @@ export function useMarketplace() {
             createdAt: s.created_at || ''
           };
         });
-        publicSellerSnapshot = [...globalState.sellers];
+          publicSellerSnapshot = [...globalState.sellers];
+        }
         notify();
 
         // 2. Fetch Products (from existing products table: id UUID, seller_shop_id, product_name, price_inr, etc.)
         const { data: dbProducts, error: productsError } = await supabase.from('products').select('*');
-        if (productsError) throw productsError;
+        if (productsError) console.warn('Product catalogue could not be loaded:', productsError.message);
         if (runId !== syncGeneration) return;
-        if (dbProducts) {
+        if (productsError) {
+          globalState.products = [];
+          notify();
+        } else if (dbProducts) {
           // Never turn malformed or incomplete database rows into believable-looking
           // listings. Required fields come from the database; invalid rows are omitted.
           globalState.products = dbProducts.flatMap((p: any): Product[] => {
@@ -287,9 +294,12 @@ export function useMarketplace() {
 
         // 3. Fetch Reviews
         const { data: dbReviews, error: reviewsError } = await supabase.from('reviews').select('*');
-        if (reviewsError) throw reviewsError;
+        if (reviewsError) console.warn('Product reviews could not be loaded:', reviewsError.message);
         if (runId !== syncGeneration) return;
-        if (dbReviews) {
+        if (reviewsError) {
+          globalState.reviews = [];
+          notify();
+        } else if (dbReviews) {
           // Never manufacture review fields or timestamps from incomplete rows.
           // Invalid database records are omitted instead of being shown as genuine.
           globalState.reviews = dbReviews.flatMap((r: any): Review[] => {
@@ -368,6 +378,16 @@ export function useMarketplace() {
           }
 
           const assignedRole = profile.account_role as UserRole;
+          if (!['customer', 'seller', 'admin'].includes(assignedRole)) {
+            await supabase.auth.signOut();
+            globalState.currentUser = null;
+            globalState.activeRole = 'customer';
+            globalState.cart = [];
+            globalState.wishlistIds = [];
+            globalState.orders = [];
+            notify();
+            throw new Error('The account has an invalid role. Sign-in was stopped.');
+          }
 
           // Fetch the current user's private seller application for every signed-in
           // account. RLS limits ordinary customers to their own rows and admins to
@@ -418,6 +438,9 @@ export function useMarketplace() {
             createdAt: authUser.created_at
           };
           globalState.activeRole = assignedRole;
+          // Publish the verified identity immediately. Optional catalogue, cart,
+          // and review queries must not leave the UI stuck as Guest on older schemas.
+          notify();
 
           // Fetch Cart from cart_items table
           const { data: dbCart, error: cartError } = await supabase
