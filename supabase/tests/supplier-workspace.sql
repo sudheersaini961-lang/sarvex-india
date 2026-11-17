@@ -27,10 +27,20 @@ BEGIN
   PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   PERFORM public.bootstrap_first_admin(v_admin);
 
+  -- The seller-shop protection trigger assigns owner_id from auth.uid().
+  -- Create each fixture under its own authenticated identity rather than
+  -- inserting both rows with an empty or shared JWT subject.
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
+  PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   INSERT INTO public.seller_shops (id, owner_id, shop_name, approval_status, owner_name)
-  VALUES
-    (v_supplier_shop, v_supplier, 'Synthetic Supplier Shop', 'pending', 'Supplier Test'),
-    (v_reseller_shop, v_reseller, 'Synthetic Reseller Shop', 'pending', 'Reseller Test');
+  VALUES (v_supplier_shop, v_supplier, 'Synthetic Supplier Shop', 'pending', 'Supplier Test');
+
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_reseller::text, 'role', 'authenticated')::text, true);
+  PERFORM set_config('request.jwt.claim.sub', v_reseller::text, true);
+  PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
+  INSERT INTO public.seller_shops (id, owner_id, shop_name, approval_status, owner_name)
+  VALUES (v_reseller_shop, v_reseller, 'Synthetic Reseller Shop', 'pending', 'Reseller Test');
 
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_admin::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_admin::text, true);
@@ -39,7 +49,6 @@ BEGIN
   SET approval_status = 'approved'
   WHERE id IN (v_supplier_shop, v_reseller_shop);
 
-  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
   PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
