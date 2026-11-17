@@ -470,7 +470,7 @@ export const SellerPortal: React.FC = () => {
             {/* Quick Metrics */}
             <div className="grid grid-cols-3 gap-2">
               <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-xs">
-                <span className="text-[10px] text-gray-500 uppercase font-bold block">Gross Sales</span>
+                <span className="text-[10px] text-gray-500 uppercase font-bold block">Recorded Item Sales</span>
                 <p className="text-base font-black text-[#1e3a8a]">
                   ₹{sellerRevenue.toLocaleString('en-IN')}
                 </p>
