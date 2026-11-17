@@ -37,6 +37,7 @@ import {
 export default function App() {
   const {
     filteredProducts,
+    products,
     categories,
     selectedCategory,
     setSelectedCategory,
@@ -121,7 +122,7 @@ export default function App() {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-2.5">
                         <span className="text-[10px] text-white font-bold bg-[#f97316] px-1.5 py-0.5 rounded">
-                          {cat.itemCount}+ Products
+                          {products.filter((product) => product.category === cat.slug || product.category === cat.name).length} Products
                         </span>
                       </div>
                     </div>
@@ -153,7 +154,7 @@ export default function App() {
                   <Package size={36} className="mx-auto text-gray-300 mb-2" />
                   <h3 className="font-bold text-sm text-gray-800">No Orders Placed Yet</h3>
                   <p className="text-xs text-gray-500 max-w-xs mx-auto mb-4">
-                    Order authentic Indian handicrafts, sarees, or audio gadgets with Cash on Delivery!
+                    Checkout is not active yet. You can browse verified listings; orders will be enabled after delivery and payment checks.
                   </p>
                   <button
                     onClick={() => setActiveTab('home')}
@@ -349,8 +350,8 @@ export default function App() {
               <div className="mx-3 grid grid-cols-3 gap-1.5 py-2 px-1 bg-white rounded-xl border border-gray-200 shadow-xs text-center">
                 <div className="flex flex-col items-center justify-center p-1">
                   <Truck size={16} className="text-[#f97316] mb-0.5" />
-                  <span className="text-[10px] font-bold text-gray-900 leading-tight">Cash on Delivery</span>
-                  <span className="text-[9px] text-gray-500">Pay at Doorstep</span>
+                  <span className="text-[10px] font-bold text-gray-900 leading-tight">Checkout Setup</span>
+                  <span className="text-[9px] text-gray-500">Orders not active yet</span>
                 </div>
                 <div className="flex flex-col items-center justify-center p-1 border-x border-gray-100">
                   <RotateCcw size={16} className="text-[#1e3a8a] mb-0.5" />
