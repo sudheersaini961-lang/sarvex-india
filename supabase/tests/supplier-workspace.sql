@@ -77,7 +77,7 @@ BEGIN
   v_blocked := false;
   BEGIN
     PERFORM public.admin_list_supplier_review_queue();
-  EXCEPTION WHEN insufficient_privilege THEN
+  EXCEPTION WHEN raise_exception THEN
     v_blocked := true;
   END;
   IF NOT v_blocked THEN
