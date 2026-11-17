@@ -26,9 +26,16 @@ export function generateUuid(): string {
 export function isValidSupabaseProjectUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
+    const hostSuffix = '.supabase.co';
+    const projectRef = parsed.hostname.endsWith(hostSuffix)
+      ? parsed.hostname.slice(0, -hostSuffix.length)
+      : '';
+
+    // Supabase project URLs have exactly one project-ref label before
+    // supabase.co. Reject nested/lookalike subdomains and malformed refs.
     return parsed.protocol === 'https:' &&
-      parsed.hostname.endsWith('.supabase.co') &&
-      parsed.hostname.length > '.supabase.co'.length &&
+      /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(projectRef) &&
+      parsed.hostname === `${projectRef}${hostSuffix}` &&
       parsed.username === '' &&
       parsed.password === '' &&
       parsed.port === '';
@@ -41,7 +48,10 @@ export function isValidSupabaseProjectUrl(value: string): boolean {
 // whose decoded role must be exactly "anon"; secret/service-role JWTs fail closed.
 export function isSafeSupabaseAnonKey(value: string): boolean {
   const key = value.trim();
-  if (key.startsWith('sb_publishable_')) return key.length > 'sb_publishable_'.length;
+  if (key.startsWith('sb_publishable_')) {
+    const token = key.slice('sb_publishable_'.length);
+    return /^[A-Za-z0-9_-]{16,}$/.test(token);
+  }
   if (key.startsWith('sb_secret_')) return false;
 
   const parts = key.split('.');
