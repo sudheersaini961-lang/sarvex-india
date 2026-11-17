@@ -32,6 +32,10 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Report dependency security advisories (read-only)
+        run: |
+          npm audit --json > npm-audit-report.json || true
+          node --input-type=commonjs -e "const a=require('./npm-audit-report.json'); console.log(JSON.stringify({metadata:a.metadata?.vulnerabilities, advisories:Object.entries(a.vulnerabilities||{}).map(([name,v])=>({name,severity:v.severity,range:v.range,fixAvailable:v.fixAvailable,via:v.via.map(x=>typeof x==='string'?x:{title:x.title,url:x.url,range:x.range})}))},null,2))"
       - name: TypeScript check
         run: npm run lint
 
