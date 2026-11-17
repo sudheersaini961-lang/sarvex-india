@@ -22,7 +22,7 @@ interface OrderTrackingModalProps {
 const ORDER_STEPS: { status: OrderStatus; label: string; desc: string }[] = [
   {
     status: 'placed',
-    label: 'Order Placed (COD)',
+    label: 'Order Placed',
     desc: 'The order record was created in the marketplace database.'
   },
   {
@@ -43,11 +43,11 @@ const ORDER_STEPS: { status: OrderStatus; label: string; desc: string }[] = [
   {
     status: 'out_for_delivery',
     label: 'Out for Delivery',
-    desc: 'The order status was marked out for delivery. Carrier integration is not connected.'
+    desc: 'The status was updated manually. Live carrier tracking is not connected.'
   },
   {
     status: 'delivered',
-    label: 'Marked as Delivered',
+    label: 'Marked Delivered (seller/admin update)',
     desc: 'The order status was marked delivered in the database.'
   }
 ];
@@ -105,7 +105,7 @@ export const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({
             <div className="text-right">
               <span className="text-[10px] font-bold text-gray-500 uppercase">Payment</span>
               <p className="text-xs font-black text-[#1e3a8a]">
-                ₹{order.totalAmount.toLocaleString('en-IN')} (COD)
+                ₹{order.totalAmount.toLocaleString('en-IN')} (payment method not recorded)
               </p>
             </div>
           </div>
@@ -113,7 +113,7 @@ export const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({
           {/* Flipkart / Meesho Vertical Stepper */}
           <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
             <h4 className="text-xs font-bold text-gray-800 uppercase tracking-wider mb-3">
-              Delivery Progress
+              Seller-Updated Order Status
             </h4>
 
             <div className="space-y-4 relative">
