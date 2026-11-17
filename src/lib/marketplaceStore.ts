@@ -706,6 +706,10 @@ export function useMarketplace() {
             }
 
             const realRole = profile.account_role as UserRole;
+            if (!['customer', 'seller', 'admin'].includes(realRole)) {
+              await supabase.auth.signOut();
+              return { success: false, message: 'The account has an invalid role and sign-in was stopped.' };
+            }
             globalState.currentUser = {
               id: userId,
               email: email.trim(),
