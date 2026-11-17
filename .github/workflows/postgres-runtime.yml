@@ -120,6 +120,15 @@ jobs:
       - name: Reapply zero-commission launch policy (idempotency check)
         run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160005_zero_commission_launch_policy.sql
 
+      - name: Apply trusted dropship payment confirmation boundary
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160006_dropship_payment_confirmation_boundary.sql
+
+      - name: Verify payment webhook trust, amount matching and replay safety
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/dropship-checkout-reservations.sql
+
+      - name: Reapply trusted dropship payment confirmation boundary (idempotency check)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160006_dropship_payment_confirmation_boundary.sql
+
   live-supabase-readonly:
     name: Optional live Supabase REST connectivity check
     runs-on: ubuntu-latest
