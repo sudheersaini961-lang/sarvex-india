@@ -2956,6 +2956,11 @@ ALTER TABLE public.sarvex_admin_allowlist FORCE ROW LEVEL SECURITY;
 
 -- ----------------------------------------------------------------------------
 -- customer_profiles: Private access only (No public SELECT)
+-- Remove legacy permissive policies: PostgreSQL combines permissive policies with OR.
+DROP POLICY IF EXISTS customer_profiles_create_policy ON public.customer_profiles;
+DROP POLICY IF EXISTS customer_profiles_read_policy ON public.customer_profiles;
+DROP POLICY IF EXISTS customer_profiles_update_policy ON public.customer_profiles;
+DROP POLICY IF EXISTS customer_profiles_delete_policy ON public.customer_profiles;
 -- ----------------------------------------------------------------------------
 DROP POLICY IF EXISTS "Users view own profile or admin" ON public.customer_profiles;
 CREATE POLICY "Users view own profile or admin"
@@ -2978,6 +2983,11 @@ CREATE POLICY "Users can update their own profile details"
 
 -- ----------------------------------------------------------------------------
 -- seller_shops: Private access only (Owner & Admin only). Public discovery via public.sellers view.
+-- Remove legacy permissive policies before installing the restrictive policy set.
+DROP POLICY IF EXISTS seller_shops_create_policy ON public.seller_shops;
+DROP POLICY IF EXISTS seller_shops_read_policy ON public.seller_shops;
+DROP POLICY IF EXISTS seller_shops_update_policy ON public.seller_shops;
+DROP POLICY IF EXISTS seller_shops_delete_policy ON public.seller_shops;
 -- ----------------------------------------------------------------------------
 DROP POLICY IF EXISTS "Public can view approved seller shops" ON public.seller_shops;
 DROP POLICY IF EXISTS "Sellers and Admins view seller shops" ON public.seller_shops;
@@ -3001,6 +3011,11 @@ CREATE POLICY "Sellers can update their own shop details"
 
 -- ----------------------------------------------------------------------------
 -- products
+-- Remove legacy permissive policies; permissive RLS policies are OR-combined.
+DROP POLICY IF EXISTS products_create_policy ON public.products;
+DROP POLICY IF EXISTS products_read_policy ON public.products;
+DROP POLICY IF EXISTS products_update_policy ON public.products;
+DROP POLICY IF EXISTS products_delete_policy ON public.products;
 -- ----------------------------------------------------------------------------
 DROP POLICY IF EXISTS "Public can view products from approved shops" ON public.products;
 CREATE POLICY "Public can view products from approved shops"
@@ -3037,6 +3052,11 @@ CREATE POLICY "Sellers can delete products from their own shop"
 
 -- ----------------------------------------------------------------------------
 -- cart_items (Owner Privacy)
+-- Remove legacy policies so no broad INSERT/UPDATE policy can OR-bypass owner checks.
+DROP POLICY IF EXISTS cart_items_create_policy ON public.cart_items;
+DROP POLICY IF EXISTS cart_items_read_policy ON public.cart_items;
+DROP POLICY IF EXISTS cart_items_update_policy ON public.cart_items;
+DROP POLICY IF EXISTS cart_items_delete_policy ON public.cart_items;
 -- ----------------------------------------------------------------------------
 DROP POLICY IF EXISTS "Users can view only their own cart items" ON public.cart_items;
 CREATE POLICY "Users can view only their own cart items"
