@@ -32,6 +32,10 @@ For the one-time, privileged first-admin procedure, see [docs/ADMIN_BOOTSTRAP.md
 - `npm run build` — Build the web bundle into `dist/`
 - `npm run preview` — Preview the built `dist/` bundle locally
 
+## Free Web Preview (GitHub Pages)
+
+The safe working branch includes an automated GitHub Pages deployment workflow. It builds the static web preview at `https://sudheersaini961-lang.github.io/sarvex-india/` when changes are pushed to `fix/public-seller-sync-security`. The first deployment may require GitHub Pages to be enabled for the repository with **Settings → Pages → Build and deployment → GitHub Actions**. The workflow does not include Supabase credentials, does not apply database migrations, and does not enable checkout. The site is not considered live until the deployment workflow succeeds and the URL is opened and checked.
+
 ## Android APK Build (Capacitor)
 
 The Capacitor Android wrapper is configured in `capacitor.config.ts` (`appId: com.sarvex.india`, `appName: SARVEX India`, `webDir: dist`).
