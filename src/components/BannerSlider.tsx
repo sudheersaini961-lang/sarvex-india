@@ -21,7 +21,7 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
       title: 'Discover Products Across Categories',
       subtitle: 'Browse marketplace categories and view products listed by approved sellers.',
       featureIcon: Truck,
-      featureText: 'Cash on Delivery availability depends on the listing.',
+      featureText: 'Checkout is not active yet; orders cannot be placed.',
       ctaText: 'Shop Best Deals',
       onCta: onExploreDealsClick
     },
@@ -42,10 +42,10 @@ export const BannerSlider: React.FC<BannerSliderProps> = ({
       bg: 'from-[#0f172a] via-[#1e293b] to-[#1e3a8a]',
       accentBg: 'bg-[#22c55e]',
       tag: 'ORDER INFORMATION',
-      title: 'Cash on Delivery Where Available',
-      subtitle: 'Payment and return terms will be shown only when configured for a real listing.',
+      title: 'Checkout Setup in Progress',
+      subtitle: 'Orders will open only after payment, delivery and return checks are complete.',
       featureIcon: ShieldCheck,
-      featureText: 'Seller verification and return policies are being configured.',
+      featureText: 'No customer payments or orders are being accepted yet.',
       ctaText: 'Explore Categories',
       onCta: onExploreDealsClick
     }
