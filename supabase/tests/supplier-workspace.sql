@@ -23,10 +23,8 @@ BEGIN
     (v_supplier, 'supplier-workspace-supplier@example.invalid', now()),
     (v_reseller, 'supplier-workspace-reseller@example.invalid', now());
 
-  -- Bootstrap must run as a direct database-admin session, not with an HTTP client JWT role.
-  RESET request.jwt.claims;
-  RESET request.jwt.claim.sub;
-  RESET request.jwt.claim.role;
+  -- Simulate the trusted backend context allowed to bootstrap the first admin.
+  PERFORM set_config('request.jwt.claim.role', 'service_role', true);
   PERFORM public.bootstrap_first_admin(v_admin);
 
   -- The seller-shop protection trigger assigns owner_id from auth.uid().
