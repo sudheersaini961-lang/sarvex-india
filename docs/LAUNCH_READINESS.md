@@ -26,12 +26,12 @@ This document separates implemented and tested code from external integrations a
 
 1. **Public web hosting:** A GitHub Pages deployment workflow has been added on the safe working branch, targeting `https://sudheersaini961-lang.github.io/sarvex-india/`. Hosting is **NOT VERIFIED** until the workflow succeeds, Pages settings permit deployment, and the URL is manually opened and checked. The static build intentionally receives no Supabase URL/key, so it cannot connect to the live database or process customer orders.
 2. **Live database:** GitHub Actions has a Supabase project URL/public key configured and its read-only `GET /products` connectivity check passed. This proves only that the REST endpoint responded; it does not prove schema readiness or safe writes. The live project still has only the four legacy public tables (`cart_items`, `customer_profiles`, `products`, `seller_shops`), and no production migration has been applied. The inspected legacy grants/policies are too broad for real marketplace use. Do not enable customer transactions until the reviewed migrations and owner-bound RLS/grants are applied and re-audited.
-2. **Customer checkout:** Direct-seller COD is disabled. No alternative online payment provider is configured.
-3. **Courier operations:** No courier account/API is connected. PIN-code serviceability, rate quotes, pickup booking, AWB generation, courier event tracking, COD cash collection and remittance are not verified.
-4. **Seller settlement:** No live COD/payment reconciliation or automated seller payout exists.
-5. **Dropship checkout:** A server-only payment-event recording boundary now exists, but no payment provider/webhook verifier is connected. No payment-confirmed reservation conversion, supplier allocation creation, customer order, COD or customer checkout UI exists. Verified events remain pending conversion; mismatched/late events require manual review and must be reconciled/refunded before stock is released.
-6. **Returns/refunds:** A complete customer return, refund, failed-delivery/RTO and seller liability workflow is not live.
-7. **Store release:** The CI artifact is a debug APK. A signed release build requires a user-controlled signing key and release configuration.
+3. **Customer checkout:** Direct-seller COD is disabled. No alternative online payment provider is configured.
+4. **Courier operations:** No courier account/API is connected. PIN-code serviceability, rate quotes, pickup booking, AWB generation, courier event tracking, COD cash collection and remittance are not verified.
+5. **Seller settlement:** No live COD/payment reconciliation or automated seller payout exists.
+6. **Dropship checkout:** A server-only payment-event recording boundary now exists, but no payment provider/webhook verifier is connected. No payment-confirmed reservation conversion, supplier allocation creation, customer order, COD or customer checkout UI exists. Verified events remain pending conversion; mismatched/late events require manual review and must be reconciled/refunded before stock is released.
+7. **Returns/refunds:** A complete customer return, refund, failed-delivery/RTO and seller liability workflow is not live.
+8. **Store release:** The CI artifact is a debug APK. A signed release build requires a user-controlled signing key and release configuration.
 
 ## Approved launch pricing recorded in code
 
