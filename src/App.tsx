@@ -152,9 +152,9 @@ export default function App() {
               {orders.length === 0 ? (
                 <div className="text-center py-16 px-4 bg-white rounded-xl border border-gray-200">
                   <Package size={36} className="mx-auto text-gray-300 mb-2" />
-                  <h3 className="font-bold text-sm text-gray-800">No Orders Placed Yet</h3>
+                  <h3 className="font-bold text-sm text-gray-800">No Orders Found</h3>
                   <p className="text-xs text-gray-500 max-w-xs mx-auto mb-4">
-                    Checkout is not active yet. You can browse verified listings; orders will be enabled after delivery and payment checks.
+                    Checkout is not active yet. No customer orders can be submitted until delivery and payment operations are connected and tested.
                   </p>
                   <button
                     onClick={() => setActiveTab('home')}
