@@ -74,11 +74,14 @@ BEGIN
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
   PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
-  v_result := public.admin_list_supplier_review_queue();
-  IF v_result IS NULL
-     OR jsonb_typeof(v_result) <> 'object'
-     OR jsonb_array_length(COALESCE(v_result -> 'suppliers', '[]'::jsonb)) <> 0 THEN
-    RAISE EXCEPTION 'Non-admin supplier received admin review queue data: %', v_result;
+  v_blocked := false;
+  BEGIN
+    PERFORM public.admin_list_supplier_review_queue();
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_blocked := true;
+  END;
+  IF NOT v_blocked THEN
+    RAISE EXCEPTION 'Non-admin supplier unexpectedly accessed the admin review queue';
   END IF;
 
   v_blocked := false;
