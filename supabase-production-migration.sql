@@ -393,7 +393,7 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public
-AS $
+AS $sarvex_profile$
 BEGIN
   INSERT INTO public.customer_profiles (owner_id, display_name, account_role, email)
   VALUES (
@@ -406,7 +406,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$;
+$sarvex_profile$;
 
 REVOKE ALL ON FUNCTION public.handle_new_auth_user_profile() FROM PUBLIC, anon, authenticated;
 DROP TRIGGER IF EXISTS trg_sarvex_create_customer_profile ON auth.users;
