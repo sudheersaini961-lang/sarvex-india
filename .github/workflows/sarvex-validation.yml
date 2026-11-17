@@ -36,10 +36,10 @@ jobs:
         run: |
           npm audit --json > npm-audit-report.json || true
           node --input-type=commonjs -e "const a=require('./npm-audit-report.json'); console.log(JSON.stringify({metadata:a.metadata?.vulnerabilities, advisories:Object.entries(a.vulnerabilities||{}).map(([name,v])=>({name,severity:v.severity,range:v.range,fixAvailable:v.fixAvailable,via:v.via.map(x=>typeof x==='string'?x:{title:x.title,url:x.url,range:x.range})}))},null,2))"
-      - name: Preview non-breaking dependency fixes (no files changed)
+      - name: Preview dependency fixes without changing files
         run: |
-          npm audit fix --dry-run --json > npm-audit-fix-preview.json || true
-          node --input-type=commonjs -e "const a=require('./npm-audit-fix-preview.json'); console.log(JSON.stringify({added:a.added,removed:a.removed,changed:a.changed,audit:a.audit?.metadata?.vulnerabilities,stderr:a.error},null,2))"
+          npm audit fix --dry-run 2>&1 | tee npm-audit-fix-preview.txt || true
+          echo "Dry-run preview complete; package files and lockfile were not changed."
       - name: TypeScript check
         run: npm run lint
 
