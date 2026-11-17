@@ -2895,57 +2895,57 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.cart_items TO authenticated
 GRANT ALL ON TABLE public.cart_items TO service_role;
 
 -- orders privilege isolation
-REVOKE ALL ON TABLE public.orders FROM PUBLIC, anon;
+REVOKE ALL ON TABLE public.orders FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.orders TO authenticated;
 GRANT ALL ON TABLE public.orders TO service_role;
 
 -- order_items privilege isolation
-REVOKE ALL ON TABLE public.order_items FROM PUBLIC, anon;
+REVOKE ALL ON TABLE public.order_items FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.order_items TO authenticated;
 GRANT UPDATE (item_status) ON TABLE public.order_items TO authenticated;
 GRANT ALL ON TABLE public.order_items TO service_role;
 
 -- order_idempotency_keys privilege isolation
-REVOKE ALL ON TABLE public.order_idempotency_keys FROM PUBLIC, anon;
+REVOKE ALL ON TABLE public.order_idempotency_keys FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT ON TABLE public.order_idempotency_keys TO authenticated;
 GRANT ALL ON TABLE public.order_idempotency_keys TO service_role;
 
--- reviews privilege isolation
-REVOKE ALL ON TABLE public.reviews FROM PUBLIC;
-GRANT SELECT ON TABLE public.reviews TO anon, authenticated, service_role;
+-- reviews privilege isolation: public read; authenticated writes are RLS/trigger constrained.
+REVOKE ALL ON TABLE public.reviews FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.reviews TO anon, authenticated;
 GRANT INSERT, UPDATE, DELETE ON TABLE public.reviews TO authenticated;
 GRANT ALL ON TABLE public.reviews TO service_role;
 
--- review_helpful_votes privilege isolation (Protects voter user IDs from anonymous harvesting)
-REVOKE ALL ON TABLE public.review_helpful_votes FROM PUBLIC, anon;
+-- review_helpful_votes privilege isolation (voter IDs remain private through RLS).
+REVOKE ALL ON TABLE public.review_helpful_votes FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT ON TABLE public.review_helpful_votes TO authenticated;
 GRANT ALL ON TABLE public.review_helpful_votes TO service_role;
 
 -- wishlist_items privilege isolation
-REVOKE ALL ON TABLE public.wishlist_items FROM PUBLIC, anon;
+REVOKE ALL ON TABLE public.wishlist_items FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, DELETE ON TABLE public.wishlist_items TO authenticated;
 GRANT ALL ON TABLE public.wishlist_items TO service_role;
 
 -- sarvex_admin_allowlist privilege isolation
-REVOKE ALL ON TABLE public.sarvex_admin_allowlist FROM PUBLIC, anon;
+REVOKE ALL ON TABLE public.sarvex_admin_allowlist FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.sarvex_admin_allowlist TO authenticated;
 GRANT ALL ON TABLE public.sarvex_admin_allowlist TO service_role;
 
--- categories privilege isolation
-REVOKE ALL ON TABLE public.categories FROM PUBLIC;
-GRANT SELECT ON TABLE public.categories TO anon, authenticated, service_role;
+-- categories: public read only
+REVOKE ALL ON TABLE public.categories FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.categories TO anon, authenticated;
 GRANT ALL ON TABLE public.categories TO service_role;
 
--- profiles view: Authenticated users view their own profile; anonymous access blocked
-REVOKE ALL ON TABLE public.profiles FROM PUBLIC, anon;
+-- profiles view: authenticated users view their own profile; anonymous access blocked
+REVOKE ALL ON TABLE public.profiles FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.profiles TO authenticated, service_role;
 
--- sellers view: Public discovery for approved shops only
-REVOKE ALL ON TABLE public.sellers FROM PUBLIC;
+-- sellers view: public discovery for approved shops only
+REVOKE ALL ON TABLE public.sellers FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.sellers TO anon, authenticated, service_role;
 
--- seller_order_items_view: Authenticated sellers and platform admins only (NO anon access)
-REVOKE ALL ON TABLE public.seller_order_items_view FROM PUBLIC, anon;
+-- seller_order_items_view: authenticated sellers and platform admins only
+REVOKE ALL ON TABLE public.seller_order_items_view FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.seller_order_items_view TO authenticated, service_role;
 
 -- ============================================================================
