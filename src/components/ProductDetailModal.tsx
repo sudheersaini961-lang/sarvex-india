@@ -248,7 +248,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         <div className="p-3 bg-white border-t border-gray-200 fixed bottom-0 left-0 right-0 max-w-lg mx-auto z-20 flex gap-2">
           <button
             onClick={handleAddToCart}
-            disabled={true}
+            disabled={currentProduct.stock === 0}
             className="flex-1 py-3 px-3 bg-white border-2 border-[#1e3a8a] text-[#1e3a8a] font-bold text-xs rounded-xl shadow-xs hover:bg-blue-50 transition tap-effect flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
             <ShoppingBag size={15} />
@@ -257,7 +257,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
           <button
             onClick={() => onBuyNow(currentProduct)}
-            disabled={currentProduct.stock === 0}
+            disabled={true}
             className="flex-1 py-3 px-3 bg-gradient-to-r from-[#f97316] to-[#ea580c] hover:from-orange-600 hover:to-orange-700 text-white font-extrabold text-xs rounded-xl shadow-md transition tap-effect flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
             <span>Checkout Not Available Yet</span>
