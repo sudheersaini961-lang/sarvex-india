@@ -5,16 +5,21 @@ DO $sarvex_signup_test$
 DECLARE
   signup_test_user_id uuid := gen_random_uuid();
   signup_test_email text := 'signup-' || gen_random_uuid()::text || '@sarvex.invalid';
+  signup_test_name text := 'SARVEX Signup Regression';
+  signup_test_phone text := '9876543210';
 BEGIN
   -- Simulate Supabase Auth creating a user before email verification/session.
-  INSERT INTO auth.users (id, email)
-  VALUES (signup_test_user_id, signup_test_email);
+  INSERT INTO auth.users (id, email, raw_user_meta_data)
+  VALUES (signup_test_user_id, signup_test_email,
+    jsonb_build_object('display_name', signup_test_name, 'phone', signup_test_phone));
 
   IF NOT EXISTS (
     SELECT 1 FROM public.customer_profiles
     WHERE owner_id = signup_test_user_id
       AND account_role = 'customer'
       AND email = signup_test_email
+      AND display_name = signup_test_name
+      AND phone = signup_test_phone
   ) THEN
     RAISE EXCEPTION 'Auth signup trigger did not create a safe customer profile';
   END IF;
