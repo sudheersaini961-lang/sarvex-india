@@ -24,7 +24,7 @@ This document separates implemented and tested code from external integrations a
 
 ## Not enabled — do not advertise as working
 
-1. **Live database:** No Supabase project has been connected or migrated. Local development state is not a live database.
+1. **Live database:** GitHub Actions has a Supabase project URL/public key configured and its read-only `GET /products` connectivity check passed. This proves only that the REST endpoint responded; it does not prove schema readiness or safe writes. The live project still has only the four legacy public tables (`cart_items`, `customer_profiles`, `products`, `seller_shops`), and no production migration has been applied. The inspected legacy grants/policies are too broad for real marketplace use. Do not enable customer transactions until the reviewed migrations and owner-bound RLS/grants are applied and re-audited.
 2. **Customer checkout:** Direct-seller COD is disabled. No alternative online payment provider is configured.
 3. **Courier operations:** No courier account/API is connected. PIN-code serviceability, rate quotes, pickup booking, AWB generation, courier event tracking, COD cash collection and remittance are not verified.
 4. **Seller settlement:** No live COD/payment reconciliation or automated seller payout exists.
@@ -44,7 +44,8 @@ Changing these prices requires an explicit policy decision and a reviewed migrat
 
 ## External prerequisites before real launch
 
-- A real Supabase project, project URL and public anon/publishable key; never put service-role keys in the Android app.
+- Apply the reviewed migrations to the intended Supabase project only after explicit deployment approval; then re-audit live RLS/grants. Never put service-role keys in the Android app.
+- Configure Supabase Authentication → URL Configuration with the real HTTPS app Site URL and exact Redirect URL. The app uses `VITE_APP_URL` (or a non-local HTTPS hosting origin) for email confirmation; localhost and Capacitor's local origin are deliberately not used as email redirects. Android deep-link return still needs a separately verified app-link configuration and device test.
 - First administrator bootstrap through the documented privileged procedure.
 - Real approved sellers, authorized product images/descriptions, inventory and seller payout/KYC information.
 - A courier/provider merchant account and credentials for serviceability, shipment creation, tracking and COD remittance. Provider costs and service terms must be reviewed first.
