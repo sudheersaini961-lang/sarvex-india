@@ -618,35 +618,49 @@ export function useMarketplace() {
 
           const userId = authData.user?.id;
           if (userId) {
-            // Safe role assignment: default to customer, prevent self-promoting to admin
-            const safeRole: UserRole = 'customer'; // Seller access is granted only after a database-approved shop.
+            // Email-confirmation projects create the auth user before a browser
+            // session exists. The database trigger creates the customer profile
+            // during auth.users INSERT; never try an unauthenticated client upsert.
+            if (!authData.session) {
+              return {
+                success: true,
+                message: 'Account request received. Please check your email and verify the address before signing in.'
+              };
+            }
 
-            // Insert into customer_profiles
-            const { error: profileError } = await supabase.from('customer_profiles').upsert({
-              id: generateUuid(),
-              owner_id: userId,
-              display_name: fullName.trim() || email.split('@')[0],
-              email: email.trim(),
-              phone: phone.trim(),
-              account_role: safeRole,
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'owner_id' });
-            if (profileError) {
+            const { data: profile, error: profileError } = await supabase
+              .from('customer_profiles')
+              .select('owner_id, display_name, email, phone, account_role')
+              .eq('owner_id', userId)
+              .maybeSingle();
+
+            if (profileError || !profile) {
               await supabase.auth.signOut();
-              return { success: false, message: `Account profile was not saved: ${profileError.message}` };
+              return {
+                success: false,
+                message: profileError
+                  ? `Account profile could not be verified: ${profileError.message}`
+                  : 'Account profile was not created by the database. Please contact SARVEX support.'
+              };
+            }
+
+            const safeRole = profile.account_role as UserRole;
+            if (!['customer', 'seller', 'admin'].includes(safeRole)) {
+              await supabase.auth.signOut();
+              return { success: false, message: 'The account has an invalid role and sign-in was stopped.' };
             }
 
             globalState.currentUser = {
               id: userId,
-              email: email.trim(),
-              fullName: fullName.trim() || email.split('@')[0],
-              phone: phone.trim(),
+              email: profile.email || email.trim(),
+              fullName: profile.display_name || email.split('@')[0],
+              phone: profile.phone || '',
               role: safeRole,
-              createdAt: new Date().toISOString()
+              createdAt: authData.user?.created_at || new Date().toISOString()
             };
             globalState.activeRole = safeRole;
             notify();
-            return { success: true, message: 'Account created successfully in Supabase!' };
+            return { success: true, message: 'Account created successfully. Your customer profile was verified.' };
           }
         } else {
           // 2. Real Supabase Auth Sign In
