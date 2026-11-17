@@ -74,6 +74,27 @@ BEGIN
   END IF;
 
 
+  -- Legacy browser-facing tables must not retain powerful direct ACLs.
+  -- RLS does not protect TRUNCATE; REFERENCES/TRIGGER are not client capabilities.
+  FOREACH required_table IN ARRAY ARRAY[
+    'customer_profiles', 'seller_shops', 'products', 'cart_items'
+  ] LOOP
+    IF has_table_privilege('anon', format('public.%I', required_table), 'INSERT')
+       OR has_table_privilege('anon', format('public.%I', required_table), 'UPDATE')
+       OR has_table_privilege('anon', format('public.%I', required_table), 'DELETE')
+       OR has_table_privilege('anon', format('public.%I', required_table), 'TRUNCATE')
+       OR has_table_privilege('anon', format('public.%I', required_table), 'REFERENCES')
+       OR has_table_privilege('anon', format('public.%I', required_table), 'TRIGGER') THEN
+      RAISE EXCEPTION 'Anonymous role retains an unsafe direct privilege on public.%', required_table;
+    END IF;
+
+    IF has_table_privilege('authenticated', format('public.%I', required_table), 'TRUNCATE')
+       OR has_table_privilege('authenticated', format('public.%I', required_table), 'REFERENCES')
+       OR has_table_privilege('authenticated', format('public.%I', required_table), 'TRIGGER') THEN
+      RAISE EXCEPTION 'Authenticated role retains an unsafe direct privilege on public.%', required_table;
+    END IF;
+  END LOOP;
+
   -- Private supplier/dropshipping foundation: tables must exist, use RLS,
   -- and remain inaccessible to browser roles until trusted RPCs are added.
   FOREACH required_table IN ARRAY ARRAY[
