@@ -1,7 +1,31 @@
 -- Runtime smoke assertions for the SARVEX migration on local Supabase.
 -- These checks are intentionally read-only and do not create marketplace data.
 
-DO $$
+DO $
+DECLARE
+  signup_test_user_id uuid := gen_random_uuid();
+BEGIN
+  -- Simulate Supabase Auth creating a user before email verification/session.
+  INSERT INTO auth.users (id, email)
+  VALUES (signup_test_user_id, 'signup-trigger-test@sarvex.invalid');
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.customer_profiles
+    WHERE owner_id = signup_test_user_id
+      AND account_role = 'customer'
+      AND email = 'signup-trigger-test@sarvex.invalid'
+  ) THEN
+    RAISE EXCEPTION 'Auth signup trigger did not create a safe customer profile';
+  END IF;
+
+  IF has_function_privilege('anon', 'public.handle_new_auth_user_profile()', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'public.handle_new_auth_user_profile()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Browser roles must not directly execute the auth profile trigger function';
+  END IF;
+END
+$;
+
+DO $
 DECLARE
   required_table text;
   required_tables text[] := ARRAY[
