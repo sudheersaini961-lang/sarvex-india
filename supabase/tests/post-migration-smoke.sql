@@ -74,6 +74,22 @@ BEGIN
   END IF;
 
 
+  -- No known legacy permissive policy may survive the hardened migration.
+  IF EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename IN ('customer_profiles','seller_shops','products','cart_items')
+      AND policyname IN (
+        'customer_profiles_create_policy','customer_profiles_read_policy','customer_profiles_update_policy','customer_profiles_delete_policy',
+        'seller_shops_create_policy','seller_shops_read_policy','seller_shops_update_policy','seller_shops_delete_policy',
+        'products_create_policy','products_read_policy','products_update_policy','products_delete_policy',
+        'cart_items_create_policy','cart_items_read_policy','cart_items_update_policy','cart_items_delete_policy'
+      )
+  ) THEN
+    RAISE EXCEPTION 'One or more known legacy permissive policies survived migration cleanup';
+  END IF;
+
   -- Legacy browser-facing tables must not retain powerful direct ACLs.
   -- RLS does not protect TRUNCATE; REFERENCES/TRIGGER are not client capabilities.
   FOREACH required_table IN ARRAY ARRAY[
