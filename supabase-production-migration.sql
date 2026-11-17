@@ -2862,8 +2862,10 @@ GRANT SELECT, INSERT, UPDATE ON TABLE public.customer_profiles TO authenticated;
 GRANT ALL ON TABLE public.customer_profiles TO service_role;
 
 -- products privilege isolation
-REVOKE ALL ON TABLE public.products FROM PUBLIC;
-GRANT SELECT ON TABLE public.products TO anon, authenticated, service_role;
+-- Revoke direct grants from anon as well as inherited PUBLIC privileges.
+-- Public catalogue reads remain available through the RLS-approved SELECT policy.
+REVOKE ALL ON TABLE public.products FROM PUBLIC, anon;
+GRANT SELECT ON TABLE public.products TO anon, authenticated;
 GRANT INSERT, UPDATE, DELETE ON TABLE public.products TO authenticated;
 GRANT ALL ON TABLE public.products TO service_role;
 
