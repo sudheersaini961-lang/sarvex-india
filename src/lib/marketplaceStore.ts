@@ -153,6 +153,19 @@ function notify() {
 export function useMarketplace() {
   const [state, setState] = useState<MarketplaceState>(globalState);
 
+  // Recreate the Supabase client and its auth/data listeners after the user
+  // saves, tests, changes, or disconnects project settings. The initial sync
+  // below runs only at mount, so a reload is required to bind the new client.
+  useEffect(() => {
+    const reloadAfterSupabaseConfigChange = () => {
+      if (typeof window !== 'undefined') window.location.reload();
+    };
+    window.addEventListener('sarvex:supabase_config_changed', reloadAfterSupabaseConfigChange);
+    return () => {
+      window.removeEventListener('sarvex:supabase_config_changed', reloadAfterSupabaseConfigChange);
+    };
+  }, []);
+
   useEffect(() => {
     const listener = () => setState({ ...globalState });
     listeners.add(listener);
