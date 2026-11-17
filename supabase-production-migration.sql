@@ -382,6 +382,40 @@ BEGIN
 END $$;
 
 -- ============================================================================
+-- 3A. CREATE CUSTOMER PROFILE AT AUTH SIGNUP (INCLUDING EMAIL-CONFIRMATION FLOW)
+-- Supabase may create auth.users without an active browser session when email
+-- confirmation is enabled. A client-side profile INSERT then cannot pass RLS.
+-- Create a minimal customer profile in a trusted trigger so verification and
+-- first sign-in are not blocked. Client code may safely upsert richer details.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.handle_new_auth_user_profile()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $
+BEGIN
+  INSERT INTO public.customer_profiles (owner_id, display_name, account_role, email)
+  VALUES (
+    NEW.id,
+    COALESCE(NULLIF(split_part(COALESCE(NEW.email, ''), '@', 1), ''), 'SARVEX Customer'),
+    'customer',
+    NEW.email
+  )
+  ON CONFLICT (owner_id) DO NOTHING;
+
+  RETURN NEW;
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.handle_new_auth_user_profile() FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS trg_sarvex_create_customer_profile ON auth.users;
+CREATE TRIGGER trg_sarvex_create_customer_profile
+AFTER INSERT ON auth.users
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_new_auth_user_profile();
+
+-- ============================================================================
 -- 4. ENHANCE EXISTING: seller_shops
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.seller_shops (
