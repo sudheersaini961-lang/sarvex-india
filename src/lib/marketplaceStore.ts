@@ -277,18 +277,46 @@ export function useMarketplace() {
         if (reviewsError) throw reviewsError;
         if (runId !== syncGeneration) return;
         if (dbReviews) {
-          globalState.reviews = dbReviews.map((r: any) => ({
-            id: r.id,
-            productId: r.product_id,
-            customerName: r.customer_name,
-            customerCity: r.customer_city || '',
-            rating: Number(r.rating ?? 0),
-            title: r.title,
-            comment: r.comment,
-            isVerifiedBuyer: Boolean(r.is_verified_buyer),
-            helpfulCount: Number(r.helpful_count || 0),
-            createdAt: r.created_at || new Date().toISOString()
-          }));
+          // Never manufacture review fields or timestamps from incomplete rows.
+          // Invalid database records are omitted instead of being shown as genuine.
+          globalState.reviews = dbReviews.flatMap((r: any): Review[] => {
+            const rating = Number(r.rating);
+            const helpfulCount = Number(r.helpful_count ?? 0);
+            const createdAt = typeof r.created_at === 'string' ? r.created_at : '';
+            if (
+              typeof r.id !== 'string' ||
+              typeof r.product_id !== 'string' ||
+              typeof r.customer_name !== 'string' ||
+              !r.customer_name.trim() ||
+              typeof r.title !== 'string' ||
+              !r.title.trim() ||
+              typeof r.comment !== 'string' ||
+              !r.comment.trim() ||
+              !Number.isSafeInteger(rating) ||
+              rating < 1 ||
+              rating > 5 ||
+              !Number.isSafeInteger(helpfulCount) ||
+              helpfulCount < 0 ||
+              !createdAt ||
+              !Number.isFinite(Date.parse(createdAt))
+            ) {
+              console.warn('A review row with missing or invalid required fields was omitted:', r.id);
+              return [];
+            }
+
+            return [{
+              id: r.id,
+              productId: r.product_id,
+              customerName: r.customer_name,
+              customerCity: typeof r.customer_city === 'string' ? r.customer_city : '',
+              rating,
+              title: r.title,
+              comment: r.comment,
+              isVerifiedBuyer: r.is_verified_buyer === true,
+              helpfulCount,
+              createdAt
+            }];
+          });
           notify();
         }
 
