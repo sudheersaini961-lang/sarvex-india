@@ -1,0 +1,56 @@
+name: Deploy SARVEX free web preview
+
+on:
+  push:
+    branches:
+      - fix/public-seller-sync-security
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: sarvex-github-pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout safe working branch
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npm run lint
+
+      - name: Build public static website
+        env:
+          GITHUB_PAGES: 'true'
+          VITE_APP_URL: 'https://sudheersaini961-lang.github.io/sarvex-india/'
+        run: npm run build
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
