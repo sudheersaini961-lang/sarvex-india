@@ -1,7 +1,7 @@
 -- Runtime smoke assertions for the SARVEX migration on local Supabase.
 -- These checks are intentionally read-only and do not create marketplace data.
 
-DO $
+DO $sarvex_signup_test$
 DECLARE
   signup_test_user_id uuid := gen_random_uuid();
 BEGIN
@@ -23,7 +23,7 @@ BEGIN
     RAISE EXCEPTION 'Browser roles must not directly execute the auth profile trigger function';
   END IF;
 END
-$;
+$sarvex_signup_test$;
 
 DO $
 DECLARE
