@@ -333,7 +333,7 @@ export const SellerPortal: React.FC = () => {
         mrp: Number(newMrp),
         stock: Number(newStock) || 0,
         imageUrl: newImageUrl.trim(),
-        isCodAvailable: true,
+        isCodAvailable: false,
         isFeatured: false
       });
       setProductSuccessMsg(`"${newTitle}" database mein save ho gaya.`);
@@ -474,7 +474,7 @@ export const SellerPortal: React.FC = () => {
                 <p className="text-base font-black text-[#1e3a8a]">
                   ₹{sellerRevenue.toLocaleString('en-IN')}
                 </p>
-                <span className="text-[9px] text-gray-500 font-bold">Based on recorded orders</span>
+                <span className="text-[9px] text-gray-500 font-bold">Gross item value only · not seller payout</span>
               </div>
               <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-xs">
                 <span className="text-[10px] text-gray-500 uppercase font-bold block">Live Products</span>
