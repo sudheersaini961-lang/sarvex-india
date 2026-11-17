@@ -84,6 +84,23 @@ export function getStoredSupabaseConfig() {
   return { url, key, isConfigured };
 }
 
+export function getAuthEmailRedirectUrl(): string | undefined {
+  const configuredAppUrl = (import.meta.env.VITE_APP_URL as string | undefined)?.trim();
+  const candidate = configuredAppUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+  if (!candidate) return undefined;
+
+  try {
+    const parsed = new URL(candidate);
+    const isLocalHost = parsed.hostname === 'localhost' ||
+      parsed.hostname === '127.0.0.1' ||
+      parsed.hostname === '::1' ||
+      parsed.hostname.endsWith('.localhost');
+    if (parsed.protocol !== 'https:' || isLocalHost || parsed.username || parsed.password) return undefined;
+    return parsed.origin;
+  } catch {
+    return undefined;
+  }
+}
 let supabaseInstance: SupabaseClient | null = null;
 
 export function getSupabase(): SupabaseClient | null {
