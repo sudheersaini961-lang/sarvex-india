@@ -2851,26 +2851,26 @@ GRANT EXECUTE ON FUNCTION public.vote_review_helpful(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.vote_review_helpful(UUID) TO service_role;
 
 -- Table & View Privileges: Strict least-privilege isolation
--- seller_shops privilege isolation (Table-level revocation strips all privileges on table and all columns)
-REVOKE ALL ON TABLE public.seller_shops FROM PUBLIC, anon;
+-- seller_shops privilege isolation
+-- Remove legacy client grants first: RLS does not protect TRUNCATE.
+REVOKE ALL ON TABLE public.seller_shops FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.seller_shops TO authenticated;
 GRANT ALL ON TABLE public.seller_shops TO service_role;
 
 -- customer_profiles privilege isolation
-REVOKE ALL ON TABLE public.customer_profiles FROM PUBLIC, anon;
+REVOKE ALL ON TABLE public.customer_profiles FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.customer_profiles TO authenticated;
 GRANT ALL ON TABLE public.customer_profiles TO service_role;
 
 -- products privilege isolation
--- Revoke direct grants from anon as well as inherited PUBLIC privileges.
--- Public catalogue reads remain available through the RLS-approved SELECT policy.
-REVOKE ALL ON TABLE public.products FROM PUBLIC, anon;
+-- Public catalogue reads remain available; writes are constrained by RLS and triggers.
+REVOKE ALL ON TABLE public.products FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON TABLE public.products TO anon, authenticated;
 GRANT INSERT, UPDATE, DELETE ON TABLE public.products TO authenticated;
 GRANT ALL ON TABLE public.products TO service_role;
 
 -- cart_items privilege isolation
-REVOKE ALL ON TABLE public.cart_items FROM PUBLIC, anon;
+REVOKE ALL ON TABLE public.cart_items FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.cart_items TO authenticated;
 GRANT ALL ON TABLE public.cart_items TO service_role;
 
