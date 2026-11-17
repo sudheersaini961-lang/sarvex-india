@@ -11,7 +11,7 @@ import {
   UserRole,
   Review,
 } from '../types/marketplace';
-import { getSupabase, generateUuid, isUuid } from './supabaseClient';
+import { getSupabase, generateUuid, isUuid, getAuthEmailRedirectUrl } from './supabaseClient';
 
 // Standard Categories
 export const INITIAL_CATEGORIES: Category[] = [
@@ -614,10 +614,12 @@ export function useMarketplace() {
       try {
         if (isSignUp) {
           // 1. Real Supabase Auth Signup
+          const emailRedirectTo = getAuthEmailRedirectUrl();
           const { data: authData, error: authErr } = await supabase.auth.signUp({
             email: email.trim(),
             password,
             options: {
+              ...(emailRedirectTo ? { emailRedirectTo } : {}),
               data: {
                 display_name: fullName.trim() || email.split('@')[0],
                 phone: phone.trim()
