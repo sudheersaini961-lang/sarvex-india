@@ -158,7 +158,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <p className="text-[11px] text-gray-500 mt-1">Applicable taxes and fees will be confirmed at checkout.</p>
           </div>
 
-          {/* COD & Delivery Check */}
+          {/* Payment and delivery readiness */}
           <div className="border border-gray-200 rounded-xl p-3.5 space-y-3">
             <div className="flex items-start gap-2.5">
               <div className="p-2 bg-emerald-100 text-emerald-800 rounded-lg">
@@ -166,13 +166,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-gray-900">Cash on Delivery (COD)</h4>
+                  <h4 className="text-xs font-bold text-gray-900">Payments & Delivery</h4>
                   <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
-                    COD only
+                    Setup pending
                   </span>
                 </div>
                 <p className="text-xs text-gray-600 mt-0.5">
-                  Cash on delivery is the currently configured payment method. Delivery serviceability is not verified by this app yet.
+                  No payment method or courier service is connected yet. Orders cannot be placed until these services are configured and verified.
                 </p>
               </div>
             </div>
@@ -192,7 +192,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {/* Pincode availability check */}
             <form onSubmit={handlePincodeCheck} className="pt-2 border-t border-gray-100">
               <label className="text-[11px] font-bold text-gray-700 block mb-1">
-                Check Delivery Time to Pincode:
+                Validate Indian PIN-code format:
               </label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
@@ -248,7 +248,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         <div className="p-3 bg-white border-t border-gray-200 fixed bottom-0 left-0 right-0 max-w-lg mx-auto z-20 flex gap-2">
           <button
             onClick={handleAddToCart}
-            disabled={currentProduct.stock === 0}
+            disabled={true}
             className="flex-1 py-3 px-3 bg-white border-2 border-[#1e3a8a] text-[#1e3a8a] font-bold text-xs rounded-xl shadow-xs hover:bg-blue-50 transition tap-effect flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
             <ShoppingBag size={15} />
@@ -260,7 +260,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             disabled={currentProduct.stock === 0}
             className="flex-1 py-3 px-3 bg-gradient-to-r from-[#f97316] to-[#ea580c] hover:from-orange-600 hover:to-orange-700 text-white font-extrabold text-xs rounded-xl shadow-md transition tap-effect flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
-            <span>Buy Now (COD)</span>
+            <span>Checkout Not Available Yet</span>
           </button>
         </div>
       </div>
