@@ -4092,8 +4092,27 @@ BEGIN
 END;
 $$;
 
+-- SECURITY DEFINER supplier/reseller RPCs must never inherit PostgreSQL's
+-- default EXECUTE privilege for PUBLIC (which includes anon).
+REVOKE ALL ON FUNCTION public.supplier_apply(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.supplier_save_stock(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, BOOLEAN) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.supplier_create_offer(UUID, NUMERIC, INTEGER, BOOLEAN) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.reseller_create_listing(UUID, NUMERIC, TEXT, TEXT, TEXT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.admin_review_supplier(UUID, TEXT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.admin_review_supplier_offer(UUID, TEXT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.admin_review_reseller_listing(UUID, TEXT) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.get_my_supplier_workspace() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.browse_supplier_offers() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.admin_list_supplier_review_queue() FROM PUBLIC, anon;
+
+GRANT EXECUTE ON FUNCTION public.supplier_apply(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.supplier_save_stock(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER, BOOLEAN) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.supplier_create_offer(UUID, NUMERIC, INTEGER, BOOLEAN) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.reseller_create_listing(UUID, NUMERIC, TEXT, TEXT, TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_review_supplier(UUID, TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_review_supplier_offer(UUID, TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_review_reseller_listing(UUID, TEXT) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.get_my_supplier_workspace() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.browse_supplier_offers() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.admin_list_supplier_review_queue() TO authenticated, service_role;
 
