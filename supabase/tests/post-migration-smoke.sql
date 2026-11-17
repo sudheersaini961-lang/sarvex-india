@@ -93,7 +93,10 @@ BEGIN
   -- Legacy browser-facing tables must not retain powerful direct ACLs.
   -- RLS does not protect TRUNCATE; REFERENCES/TRIGGER are not client capabilities.
   FOREACH required_table IN ARRAY ARRAY[
-    'customer_profiles', 'seller_shops', 'products', 'cart_items'
+    'customer_profiles', 'seller_shops', 'products', 'cart_items',
+    'orders', 'order_items', 'order_idempotency_keys', 'reviews',
+    'review_helpful_votes', 'wishlist_items', 'sarvex_admin_allowlist',
+    'categories'
   ] LOOP
     IF has_table_privilege('anon', format('public.%I', required_table), 'INSERT')
        OR has_table_privilege('anon', format('public.%I', required_table), 'UPDATE')
