@@ -40,6 +40,7 @@ BEGIN
   WHERE id IN (v_supplier_shop, v_reseller_shop);
 
   PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
+  PERFORM set_config('request.jwt.claims', jsonb_build_object('sub', v_supplier::text, 'role', 'authenticated')::text, true);
   PERFORM set_config('request.jwt.claim.sub', v_supplier::text, true);
   PERFORM set_config('request.jwt.claim.role', 'authenticated', true);
   v_result := public.supplier_apply(
