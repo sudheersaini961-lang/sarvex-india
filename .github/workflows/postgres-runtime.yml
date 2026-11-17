@@ -63,6 +63,15 @@ jobs:
       - name: Verify migration runtime invariants
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
 
+      - name: Seed exact legacy RLS policies for cleanup regression
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/seed-legacy-rls-policies.sql
+
+      - name: Reapply migration and remove known legacy RLS policies
+        run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
+
+      - name: Verify legacy RLS policies were removed and hardened policies restored
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
+
       - name: Verify trusted first-admin bootstrap (transaction rolled back)
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/admin-bootstrap.sql
 
