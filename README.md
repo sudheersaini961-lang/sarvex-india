@@ -19,7 +19,7 @@ For the one-time, privileged first-admin procedure, see [docs/ADMIN_BOOTSTRAP.md
    ```bash
    npm install
    ```
-2. *(Optional)* Configure local environment variables by copying `.env.example` to `.env.local` and adding your own public values (`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`). Never place a Supabase `service_role` key or private secret in client `.env*` files.
+2. *(Optional)* Configure local environment variables by copying `.env.example` to `.env.local` and adding your public values (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and the real public `VITE_APP_URL`). Add that exact HTTPS app URL to Supabase Authentication → URL Configuration → Redirect URLs. Never place a Supabase `service_role` key or private secret in client `.env*` files.
 3. Start the development server (runs on port `3000`):
    ```bash
    npm run dev
