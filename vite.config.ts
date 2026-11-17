@@ -5,6 +5,8 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // GitHub Pages serves this project under /sarvex-india/; Capacitor/local builds keep relative asset paths.
+    base: process.env.GITHUB_PAGES === 'true' ? '/sarvex-india/' : './',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
