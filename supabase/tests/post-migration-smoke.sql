@@ -25,7 +25,7 @@ BEGIN
 END
 $sarvex_signup_test$;
 
-DO $
+DO $sarvex_smoke$
 DECLARE
   required_table text;
   required_tables text[] := ARRAY[
@@ -260,6 +260,6 @@ BEGIN
     RAISE EXCEPTION 'Private seller-kyc-documents bucket is missing or public';
   END IF;
 END
-$$;
+$sarvex_smoke$;
 
 SELECT 'SARVEX migration runtime smoke checks passed' AS result;
