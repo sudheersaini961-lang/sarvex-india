@@ -217,7 +217,7 @@ BEGIN
     RAISE EXCEPTION 'Expiry worker did not expire exactly one reservation: %', v_expired_count;
   END IF;
   SELECT reserved_quantity INTO v_reserved FROM public.supplier_stock WHERE id = v_stock_id;
-  IF v_reserved <> 0 THEN RAISE EXCEPTION 'Expired reservation did not release stock'; END IF;
+  IF v_reserved <> 2 THEN RAISE EXCEPTION 'Expiry worker must release only the abandoned hold and preserve paid/manual-review holds; reserved=%', v_reserved; END IF;
   IF (SELECT status FROM public.dropship_checkout_reservations WHERE id = v_reservation) <> 'expired' THEN
     RAISE EXCEPTION 'Expired reservation status was not recorded';
   END IF;
