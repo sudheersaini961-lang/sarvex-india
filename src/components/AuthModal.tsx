@@ -40,23 +40,28 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
 
     setIsSubmitting(true);
-    const result = await loginUserWithSupabase(
-      email.trim(),
-      password,
-      isSignUp,
-      fullName.trim(),
-      phone.trim(),
-      role
-    );
-    setIsSubmitting(false);
+    try {
+      const result = await loginUserWithSupabase(
+        email.trim(),
+        password,
+        isSignUp,
+        fullName.trim(),
+        phone.trim(),
+        role
+      );
 
-    if (result.success) {
-      setSuccessMessage(result.message);
-      setTimeout(() => {
-        onClose();
-      }, 1000);
-    } else {
-      setErrorMessage(result.message);
+      if (result.success) {
+        setSuccessMessage(result.message);
+        setTimeout(() => {
+          onClose();
+        }, 1000);
+      } else {
+        setErrorMessage(result.message);
+      }
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : 'Authentication could not be completed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
