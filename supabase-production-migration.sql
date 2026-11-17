@@ -395,12 +395,17 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $sarvex_profile$
 BEGIN
-  INSERT INTO public.customer_profiles (owner_id, display_name, account_role, email)
+  INSERT INTO public.customer_profiles (owner_id, display_name, account_role, email, phone)
   VALUES (
     NEW.id,
-    COALESCE(NULLIF(split_part(COALESCE(NEW.email, ''), '@', 1), ''), 'SARVEX Customer'),
+    COALESCE(
+      NULLIF(btrim(NEW.raw_user_meta_data ->> 'display_name'), ''),
+      NULLIF(split_part(COALESCE(NEW.email, ''), '@', 1), ''),
+      'SARVEX Customer'
+    ),
     'customer',
-    NEW.email
+    NEW.email,
+    NULLIF(btrim(NEW.raw_user_meta_data ->> 'phone'), '')
   )
   ON CONFLICT (owner_id) DO NOTHING;
 
