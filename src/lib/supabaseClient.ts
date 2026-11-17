@@ -36,6 +36,9 @@ export function isValidSupabaseProjectUrl(value: string): boolean {
     return parsed.protocol === 'https:' &&
       /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(projectRef) &&
       parsed.hostname === `${projectRef}${hostSuffix}` &&
+      parsed.pathname === '/' &&
+      parsed.search === '' &&
+      parsed.hash === '' &&
       parsed.username === '' &&
       parsed.password === '' &&
       parsed.port === '';
