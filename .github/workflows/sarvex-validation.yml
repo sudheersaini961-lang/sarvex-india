@@ -9,7 +9,7 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: sarvex-validation-${{ github.ref }}
@@ -57,3 +57,16 @@ jobs:
 
       - name: Production web build
         run: npm run build
+
+      - name: Commit regenerated lockfile on safe branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/public-seller-sync-security'
+        run: |
+          if ! git diff --quiet -- package-lock.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "Regenerate lockfile after moving build tooling to dev dependencies"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          else
+            echo "Lockfile already matches package.json."
+          fi
