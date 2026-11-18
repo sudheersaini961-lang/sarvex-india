@@ -21,12 +21,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: sarvex-postgres-runtime-${ github.ref }}
+  group: sarvex-postgres-runtime-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   migration-runtime:
-    name: PostgreSQL ${ matrix.pg }} migration runtime
+    name: PostgreSQL ${{ matrix.pg }} migration runtime
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -34,7 +34,7 @@ jobs:
         pg: ["15", "16"]
     services:
       postgres:
-        image: postgres:${ matrix.pg }}
+        image: postgres:${{ matrix.pg }}
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
