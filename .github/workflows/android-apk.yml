@@ -1,5 +1,8 @@
 name: Build SARVEX Android Debug APK
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
   push:
@@ -15,6 +18,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v5
