@@ -51,7 +51,7 @@ BEGIN
 
     -- seller_shops
     ('public', 'seller_shops', 'Sellers and Admins view seller shops', 'SELECT', 'public', 'PERMISSIVE',
-     '^[\s\(\)]*\(?\(?\(?(auth\.)?uid\(\)\s+is\s+not\s+null\s*and\s*\(?owner_id\s*=\s*(auth\.)?uid\(\)\)?\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$', NULL),
+     '^[\\s\\(\\)]*(auth\\.)?uid\\(\\)\\s+is\\s+not\\s+null[\\s\\(\\)]*and[\\s\\(\\)]*owner_id\\s*=\\s*(auth\\.)?uid\\(\\)[\\s\\(\\)]*or[\\s\\(\\)]*(public\\.)?is_sarvex_admin\\(\\)[\\s\\(\\)]*$', NULL),
     ('public', 'seller_shops', 'Authenticated users can register a shop', 'INSERT', 'public', 'PERMISSIVE',
      NULL, '^[\s\(\)]*\(?\(?approval_status\s*=\s*''pending''(::text)?\s*and\s*\(?(auth\.)?uid\(\)\s*=\s*owner_id\)?\)?\)?[\s\(\)]*$'),
     ('public', 'seller_shops', 'Sellers can update their own shop details', 'UPDATE', 'public', 'PERMISSIVE',
