@@ -55,7 +55,7 @@ jobs:
           const report = require('./npm-audit-report.json');
           const vulnerabilities = report.vulnerabilities || {};
           const expectedUrl = 'https://github.com/advisories/GHSA-fc5q-39xc-vjpf';
-          const high = Object.entries(vulnerabilities).filter(([, item]) => item.severity === 'high');
+          const high = Object.entries(vulnerabilities).filter(([, item]) => ['high', 'critical'].includes(item.severity));
           if (!high.length) {
             console.log('No HIGH vulnerabilities in the full dependency audit.');
             process.exit(0);
