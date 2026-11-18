@@ -44,11 +44,19 @@ jobs:
           # The current npm audit report contains one known picomatch advisory
           # propagated only through the Vite build-tool chain. Fail on every other
           # HIGH finding, and fail if that advisory reaches production dependencies.
+          set +e
           npm ls picomatch --omit=dev --all > production-picomatch-tree.txt 2>&1
+          npm_tree_status=$?
+          set -e
           if grep -q 'picomatch@' production-picomatch-tree.txt; then
             echo "::error::picomatch is present in the production dependency tree."
             cat production-picomatch-tree.txt
             exit 1
+          fi
+          if [ "$npm_tree_status" -ne 0 ] && ! grep -q '(empty)' production-picomatch-tree.txt; then
+            echo "::error::Could not reliably inspect the production dependency tree."
+            cat production-picomatch-tree.txt
+            exit "$npm_tree_status"
           fi
           node <<'NODE'
           const report = require('./npm-audit-report.json');
