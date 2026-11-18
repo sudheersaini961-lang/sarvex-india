@@ -29,7 +29,7 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Regenerate lockfile with patched dependency override
+      - name: Regenerate lockfile after dependency classification
         run: npm install --package-lock-only --ignore-scripts
 
       - name: Install locked dependencies
