@@ -34,64 +34,11 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Report dependency security advisories
-        run: |
-          npm audit --json > npm-audit-report.json || true
-          node --input-type=commonjs -e "const a=require('./npm-audit-report.json'); console.log(JSON.stringify({metadata:a.metadata?.vulnerabilities, advisories:Object.entries(a.vulnerabilities||{}).map(([name,v])=>({name,severity:v.severity,range:v.range,fixAvailable:v.fixAvailable,via:v.via.map(x=>typeof x==='string'?x:{title:x.title,url:x.url,range:x.range})}))},null,2))"
-      - name: Enforce full dependency audit policy
-        shell: bash
-        run: |
-          # The current npm audit report contains one known picomatch advisory
-          # propagated only through the Vite build-tool chain. Fail on every other
-          # HIGH finding, and fail if that advisory reaches production dependencies.
-          set +e
-          npm ls picomatch --omit=dev --all > production-picomatch-tree.txt 2>&1
-          npm_tree_status=$?
-          set -e
-          if grep -q 'picomatch@' production-picomatch-tree.txt; then
-            echo "::error::picomatch is present in the production dependency tree."
-            cat production-picomatch-tree.txt
-            exit 1
-          fi
-          if [ "$npm_tree_status" -ne 0 ] && ! grep -q '(empty)' production-picomatch-tree.txt; then
-            echo "::error::Could not reliably inspect the production dependency tree."
-            cat production-picomatch-tree.txt
-            exit "$npm_tree_status"
-          fi
-          node <<'NODE'
-          const report = require('./npm-audit-report.json');
-          const vulnerabilities = report.vulnerabilities || {};
-          const expectedUrl = 'https://github.com/advisories/GHSA-fc5q-39xc-vjpf';
-          const high = Object.entries(vulnerabilities).filter(([, item]) => ['high', 'critical'].includes(item.severity));
-          if (!high.length) {
-            console.log('No HIGH vulnerabilities in the full dependency audit.');
-            process.exit(0);
-          }
-          function advisoryUrls(name, seen = new Set()) {
-            if (seen.has(name)) return new Set();
-            seen.add(name);
-            const item = vulnerabilities[name];
-            const urls = new Set();
-            for (const via of item?.via || []) {
-              if (typeof via === 'string') {
-                for (const url of advisoryUrls(via, seen)) urls.add(url);
-              } else if (via && typeof via.url === 'string') {
-                urls.add(via.url);
-              }
-            }
-            return urls;
-          }
-          const unexpected = high.filter(([name]) => {
-            const urls = advisoryUrls(name);
-            return urls.size !== 1 || !urls.has(expectedUrl);
-          });
-          if (unexpected.length) {
-            console.error('Unexpected HIGH findings:', unexpected.map(([name]) => name));
-            process.exit(1);
-          }
-          console.log('Only the documented picomatch advisory is present in the HIGH dependency chain.');
-          console.log('It is confirmed absent from production dependencies; all other HIGH findings remain blocking.');
-          NODE
+      - name: Test SARVEX picomatch ReDoS regression cases
+        run: node scripts/test-picomatch-redos.cjs
+
+      - name: Enforce complete dependency security audit
+        run: npm audit --audit-level=high
 
       - name: Inspect production dependency path to Vite advisories
         run: npm ls vite fdir picomatch --omit=dev || true
