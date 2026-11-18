@@ -233,6 +233,17 @@ BEGIN
         AND s.cmd = pol.cmd
         AND s.permissive = pol.permissive
         AND pol.roles::text[] = ARRAY[s.target_role]
+        -- The KYC update policy must always prevent edits after seller approval.
+        -- Require the ownership and approved-status exclusion in BOTH USING and WITH CHECK.
+        AND (
+          pol.policyname <> 'Sellers update own KYC documents'
+          OR (
+            pol.qual IS NOT NULL
+            AND pol.qual ~* 'not.*exists.*seller_shops.*owner_id\\s*=\\s*(auth\\.)?uid\\(\\).*approval_status\\s*=\\s*''approved'''
+            AND pol.with_check IS NOT NULL
+            AND pol.with_check ~* 'not.*exists.*seller_shops.*owner_id\\s*=\\s*(auth\\.)?uid\\(\\).*approval_status\\s*=\\s*''approved'''
+          )
+        )
         AND (
           (s.qual_pattern IS NULL AND pol.qual IS NULL) OR
           (s.qual_pattern IS NOT NULL AND pol.qual IS NOT NULL AND pol.qual ~* s.qual_pattern)
