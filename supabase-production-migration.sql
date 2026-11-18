@@ -239,9 +239,9 @@ BEGIN
           pol.policyname <> 'Sellers update own KYC documents'
           OR (
             pol.qual IS NOT NULL
-            AND pol.qual ~* 'not.*exists.*seller_shops.*owner_id\\s*=\\s*(auth\\.)?uid\\(\\).*approval_status\\s*=\\s*''approved'''
+            AND pol.qual ~* 'not.*exists.*seller_shops.*owner_id\s*=\s*(auth\.)?uid\(\).*approval_status\s*=\s*''approved'''
             AND pol.with_check IS NOT NULL
-            AND pol.with_check ~* 'not.*exists.*seller_shops.*owner_id\\s*=\\s*(auth\\.)?uid\\(\\).*approval_status\\s*=\\s*''approved'''
+            AND pol.with_check ~* 'not.*exists.*seller_shops.*owner_id\s*=\s*(auth\.)?uid\(\).*approval_status\s*=\s*''approved'''
           )
         )
         AND (
