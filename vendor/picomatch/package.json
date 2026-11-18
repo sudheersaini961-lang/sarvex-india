@@ -1,0 +1,16 @@
+{
+  "name": "picomatch",
+  "version": "4.0.8-sarvex.1",
+  "description": "SARVEX-maintained picomatch fork with upstream extglob ReDoS mitigation",
+  "license": "MIT",
+  "main": "index.js",
+  "engines": {
+    "node": ">=12"
+  },
+  "sideEffects": false,
+  "files": [
+    "index.js",
+    "posix.js",
+    "lib"
+  ]
+}
