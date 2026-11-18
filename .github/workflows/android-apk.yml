@@ -1,5 +1,9 @@
 name: Build SARVEX Android Debug APK
 
+# Restrict the workflow token to read-only repository access.
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
   push:
@@ -14,6 +18,9 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          # The build does not need to push commits or tags.
+          persist-credentials: false
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
