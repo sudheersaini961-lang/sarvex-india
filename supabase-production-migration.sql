@@ -173,10 +173,10 @@ BEGIN
     ('storage', 'objects', 'Sellers view own KYC documents', 'SELECT', 'authenticated', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?\(?\(?storage\.foldername\(name\)\)?\[1\]\s*=\s*\(?(auth\.)?uid\(\)\)?::text\)?\)?[\s\(\)]*$', NULL),
     ('storage', 'objects', 'Sellers update own KYC documents', 'UPDATE', 'authenticated', 'PERMISSIVE',
-     '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?\(?\(?storage\.foldername\(name\)\)?\[1\]\s*=\s*\(?(auth\.)?uid\(\)\)?::text\)?\)?(\s*and\s*not\s*\(?exists\s*\(.*seller_shops.*approval_status\s*=\s*''approved''.*\)\)?\)?)*[\s\(\)]*$',
-     '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?\(?\(?storage\.foldername\(name\)\)?\[1\]\s*=\s*\(?(auth\.)?uid\(\)\)?::text\)?\)?(\s*and\s*not\s*\(?exists\s*\(.*seller_shops.*approval_status\s*=\s*''approved''.*\)\)?\)?)*[\s\(\)]*$'),
+     '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?\(?\(?storage\.foldername\(name\)\)?\[1\]\s*=\s*\(?(auth\.)?uid\(\)\)?::text\)?\)?(\s*and\s*\(?not\s*\(?exists\s*\(.*seller_shops.*owner_id\s*=\s*(auth\.)?uid\(\).*approval_status\s*=\s*''approved''.*\)[\s\(\)]*)?[\s\(\)]*$',
+     '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?\(?\(?storage\.foldername\(name\)\)?\[1\]\s*=\s*\(?(auth\.)?uid\(\)\)?::text\)?\)?(\s*and\s*\(?not\s*\(?exists\s*\(.*seller_shops.*owner_id\s*=\s*(auth\.)?uid\(\).*approval_status\s*=\s*''approved''.*\)[\s\(\)]*)?[\s\(\)]*$'),
     ('storage', 'objects', 'Sellers delete own KYC documents', 'DELETE', 'authenticated', 'PERMISSIVE',
-     '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?\(?\(?storage\.foldername\(name\)\)?\[1\]\s*=\s*\(?(auth\.)?uid\(\)\)?::text\)?\)?(\s*and\s*not\s*\(?exists\s*\(.*seller_shops.*approval_status\s*=\s*''approved''.*\)\)?\)?)*[\s\(\)]*$', NULL),
+     '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?\(?\(?storage\.foldername\(name\)\)?\[1\]\s*=\s*\(?(auth\.)?uid\(\)\)?::text\)?\)?(\s*and\s*\(?not\s*\(?exists\s*\(.*seller_shops.*owner_id\s*=\s*(auth\.)?uid\(\).*approval_status\s*=\s*''approved''.*\)[\s\(\)]*)?[\s\(\)]*$', NULL),
     ('storage', 'objects', 'Admins manage all KYC documents', 'ALL', 'authenticated', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$',
      '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$');
