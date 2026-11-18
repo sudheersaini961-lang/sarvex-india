@@ -84,7 +84,7 @@ BEGIN
 
     -- orders
     ('public', 'orders', 'Customers and Admins view relevant orders', 'SELECT', 'public', 'PERMISSIVE',
-     '^[\s\(\)]*\(?\(?\(?(auth\.)?uid\(\)\s+is\s+not\s+null\s*and\s*\(?customer_id\s*=\s*(auth\.)?uid\(\)\)?\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$', NULL),
+      '^[\s\(\)]*\(*\s*(auth\.)?uid\(\)\s+is\s+not\s+null\s*\)*\s+and\s+\(*\s*customer_id\s*=\s*(auth\.)?uid\(\)\s*\)*\s*\)*\s+or\s+\(*\s*(public\.)?is_sarvex_admin\(\)\s*\)*\s*\)*[\s\(\)]*$', NULL),
     ('public', 'orders', 'Customers and Sellers view relevant orders', 'SELECT', 'public', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?\(?(auth\.)?uid\(\)\s+is\s+not\s+null\s*and\s*\(?customer_id\s*=\s*(auth\.)?uid\(\)\)?\)?\s*or\s*\(?(public\.)?is_seller_shop_owner\(.*\)\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$', NULL),
     ('public', 'orders', 'Only admins or trusted procedures create orders', 'INSERT', 'public', 'PERMISSIVE',
