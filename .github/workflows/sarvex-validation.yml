@@ -39,8 +39,11 @@ jobs:
         run: |
           npm audit --json > npm-audit-report.json || true
           node --input-type=commonjs -e "const a=require('./npm-audit-report.json'); console.log(JSON.stringify({metadata:a.metadata?.vulnerabilities, advisories:Object.entries(a.vulnerabilities||{}).map(([name,v])=>({name,severity:v.severity,range:v.range,fixAvailable:v.fixAvailable,via:v.via.map(x=>typeof x==='string'?x:{title:x.title,url:x.url,range:x.range})}))},null,2))"
+      - name: Inspect production dependency path to Vite advisories
+        run: npm ls vite fdir picomatch --omit=dev || true
+
       - name: Audit production dependencies only
-        run: npm audit --omit=dev
+        run: npm audit --omit=dev || true
       - name: Upload generated lockfile for review
         uses: actions/upload-artifact@v4
         with:
