@@ -83,7 +83,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="bg-blue-900/60 p-2.5 rounded-xl border border-blue-700/50">
             <span className="text-[10px] text-blue-200 uppercase font-bold block">Gross GMV</span>
             <p className="text-base font-black text-white">₹{stats.gmv.toLocaleString('en-IN')}</p>
-            <span className="text-[9px] text-emerald-300 font-medium">Cash On Delivery</span>
+            <span className="text-[9px] text-blue-200 font-medium">Recorded order totals only</span>
           </div>
 
           <div className="bg-blue-900/60 p-2.5 rounded-xl border border-blue-700/50">
@@ -125,7 +125,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {pendingSellers.length === 0 ? (
           <div className="p-4 bg-emerald-50 rounded-lg text-emerald-800 text-xs font-medium flex items-center gap-2">
             <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-            <span>All seller onboarding applications have been reviewed. No pending queues!</span>
+            <span>No pending applications are currently visible to this admin account.</span>
           </div>
         ) : (
           <div className="space-y-2.5">
