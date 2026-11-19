@@ -223,7 +223,6 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
             <button
               disabled={true}
-              disabled={true}
               className="w-full py-3 bg-gray-300 text-gray-600 font-extrabold text-sm rounded-xl flex items-center justify-center gap-2 cursor-not-allowed"
             >
               <span>Checkout temporarily unavailable</span>
