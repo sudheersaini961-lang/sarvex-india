@@ -23,6 +23,15 @@ BEGIN
     RAISE EXCEPTION 'FAIL: anonymous seller column privileges are not least-privilege';
   END IF;
 
+  IF NOT has_table_privilege('anon','public.sellers','SELECT')
+     OR has_table_privilege('anon','public.seller_shops','SELECT')
+     OR has_column_privilege('anon','public.seller_shops','phone','SELECT')
+     OR has_column_privilege('anon','public.seller_shops','email','SELECT')
+     OR has_column_privilege('anon','public.seller_shops','pickup_address','SELECT')
+     OR has_column_privilege('anon','public.seller_shops','upi_id','SELECT') THEN
+    RAISE EXCEPTION 'FAIL: public seller view is not the only anonymous seller-directory access path';
+  END IF;
+
   IF has_function_privilege('anon','public.place_sarvex_order(text,text,text,text,text,text,text,jsonb,text)','EXECUTE') THEN
     RAISE EXCEPTION 'FAIL: anon can execute COD checkout';
   END IF;

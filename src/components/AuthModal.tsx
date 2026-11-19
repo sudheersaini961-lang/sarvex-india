@@ -29,7 +29,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setErrorMessage('');
     setSuccessMessage('');
 
-    if (!email.trim() || !password.trim()) {
+    if (!email.trim() || password.length === 0) {
       setErrorMessage('Please provide both email and password.');
       return;
     }
@@ -42,7 +42,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     setIsSubmitting(true);
     const result = await loginUserWithSupabase(
       email.trim(),
-      password.trim(),
+      password,
       isSignUp,
       fullName.trim(),
       phone.trim(),

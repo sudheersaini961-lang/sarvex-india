@@ -165,28 +165,32 @@ export function useMarketplace() {
       if (!supabase) return;
 
       try {
-        // 1. Fetch Sellers / Seller Shops (from existing seller_shops table)
-        const { data: dbShops, error: shopsError } = await supabase.from('seller_shops').select('id, owner_id, shop_name, owner_name, phone, email, city, state, pincode, pickup_address, approval_status, commission_rate, rating, created_at');
+        // 1. Fetch the public seller directory through its security-invoker view.
+        // The view exposes only public shop fields; private contact/pickup/payout data
+        // is fetched separately for the signed-in owner below.
+        const { data: dbShops, error: shopsError } = await supabase
+          .from('sellers')
+          .select('id, user_id, store_name, owner_name, city, state, pincode, status, rating, created_at');
         if (shopsError) throw shopsError;
         const shopNameMap: Record<string, string> = {};
 
         if (dbShops) {
           globalState.sellers = dbShops.map((s: any) => {
-            const storeName = s.shop_name || s.store_name || 'Store';
+            const storeName = s.store_name || 'Store';
             shopNameMap[s.id] = storeName;
             return {
               id: s.id,
-              userId: s.owner_id || s.user_id || '',
+              userId: s.user_id || '',
               storeName,
               ownerName: s.owner_name || 'Verified Merchant',
-              phone: s.phone || '',
-              email: s.email || '',
+              phone: '',
+              email: '',
               city: s.city || 'India',
               state: s.state || '',
               pincode: s.pincode || '',
-              pickupAddress: s.pickup_address || '',
-              status: (s.approval_status || s.status || 'pending') as any,
-              commissionRate: Number(s.commission_rate || 0),
+              pickupAddress: '',
+              status: (s.status || 'pending') as any,
+              commissionRate: 0,
               rating: Number(s.rating ?? 0),
               createdAt: s.created_at || new Date().toISOString()
             };
@@ -194,8 +198,10 @@ export function useMarketplace() {
           notify();
         }
 
-        // 2. Fetch Products (from existing products table: id UUID, seller_shop_id, product_name, price_inr, etc.)
-        const { data: dbProducts, error: productsError } = await supabase.from('products').select('*');
+        // 2. Fetch only fields required to render the public product catalogue.
+        const { data: dbProducts, error: productsError } = await supabase
+          .from('products')
+          .select('id, seller_shop_id, product_name, price_inr, discount_percent, mrp, stock_quantity, image_url, description, category, badge, rating, rating_count, is_featured, created_at');
         if (productsError) throw productsError;
         if (dbProducts) {
           globalState.products = dbProducts.map((p: any) => {
@@ -228,7 +234,9 @@ export function useMarketplace() {
         }
 
         // 3. Fetch Reviews
-        const { data: dbReviews, error: reviewsError } = await supabase.from('reviews').select('*');
+        const { data: dbReviews, error: reviewsError } = await supabase
+          .from('reviews')
+          .select('id, product_id, customer_name, customer_city, rating, title, comment, is_verified_buyer, helpful_count, created_at');
         if (reviewsError) throw reviewsError;
         if (dbReviews) {
           globalState.reviews = dbReviews.map((r: any) => ({
@@ -268,6 +276,38 @@ export function useMarketplace() {
             createdAt: authUser.created_at
           };
           globalState.activeRole = assignedRole;
+
+          // Fetch the signed-in user's own shop details (including pending applications).
+          // RLS limits this query to the owner/admin; never request payout credentials here.
+          const { data: ownShop, error: ownShopError } = await supabase
+            .from('seller_shops')
+            .select('id, owner_id, shop_name, owner_name, phone, email, city, state, pincode, pickup_address, approval_status, commission_rate, rating, created_at')
+            .eq('owner_id', authUser.id)
+            .maybeSingle();
+          if (ownShopError) throw ownShopError;
+          if (ownShop) {
+            const ownSeller = {
+              id: ownShop.id,
+              userId: ownShop.owner_id,
+              storeName: ownShop.shop_name || 'Store',
+              ownerName: ownShop.owner_name || '',
+              phone: ownShop.phone || '',
+              email: ownShop.email || '',
+              city: ownShop.city || '',
+              state: ownShop.state || '',
+              pincode: ownShop.pincode || '',
+              pickupAddress: ownShop.pickup_address || '',
+              status: (ownShop.approval_status || 'pending') as any,
+              commissionRate: Number(ownShop.commission_rate || 0),
+              rating: Number(ownShop.rating ?? 0),
+              createdAt: ownShop.created_at || new Date().toISOString()
+            };
+            globalState.sellers = [
+              ...globalState.sellers.filter((seller) => seller.id !== ownSeller.id),
+              ownSeller
+            ];
+            shopNameMap[ownSeller.id] = ownSeller.storeName;
+          }
 
           // Fetch Cart from cart_items table
           const { data: dbCart } = await supabase
@@ -444,7 +484,7 @@ export function useMarketplace() {
         if (isSignUp) {
           const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
             email: email.trim(),
-            password: password.trim(),
+            password,
             options: {
               data: {
                 full_name: fullName.trim(),
@@ -509,7 +549,7 @@ export function useMarketplace() {
           // Real Supabase Auth Sign In
           const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
             email: email.trim(),
-            password: password.trim()
+            password
           });
 
           if (authErr) {
