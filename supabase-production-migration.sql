@@ -84,7 +84,7 @@ BEGIN
 
     -- orders
     ('public', 'orders', 'Customers and Admins view relevant orders', 'SELECT', 'public', 'PERMISSIVE',
-      '^[\s\(\)]*\(*\s*(auth\.)?uid\(\)\s+is\s+not\s+null\s*\)*\s+and\s+\(*\s*customer_id\s*=\s*(auth\.)?uid\(\)\s*\)*\s*\)*\s+or\s+\(*\s*(public\.)?is_sarvex_admin\(\)\s*\)*\s*\)*[\s\(\)]*$', NULL),
+      '^[\\s\\(\\)]*\\(*\\s*(auth\\.)?uid\\(\\)\\s+is\\s+not\\s+null\\s*\\)*\\s+and\\s+\\(*\\s*customer_id\\s*=\\s*(auth\\.)?uid\\(\\)\\s*\\)*\\s*\\)*\\s+or\\s+\\(*\\s*(public\\.)?order_has_seller_item\\(\\s*id\\s*\\)\\s*\\)*\\s+or\\s+\\(*\\s*(public\\.)?is_sarvex_admin\\(\\)\\s*\\)*\\s*\\)*[\\s\\(\\)]*$', NULL),
     ('public', 'orders', 'Customers and Sellers view relevant orders', 'SELECT', 'public', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?\(?(auth\.)?uid\(\)\s+is\s+not\s+null\s*and\s*\(?customer_id\s*=\s*(auth\.)?uid\(\)\)?\)?\s*or\s*\(?(public\.)?is_seller_shop_owner\(.*\)\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$', NULL),
     ('public', 'orders', 'Only admins or trusted procedures create orders', 'INSERT', 'public', 'PERMISSIVE',
@@ -1356,7 +1356,7 @@ WITH (security_invoker = true) AS
   FROM public.customer_profiles;
 
 CREATE OR REPLACE VIEW public.sellers
-WITH (security_barrier = true, security_invoker = false) AS
+WITH (security_barrier = true, security_invoker = true) AS
   SELECT
     id,
     owner_id AS user_id,
@@ -1374,7 +1374,7 @@ WITH (security_barrier = true, security_invoker = false) AS
 ALTER VIEW public.sellers OWNER TO postgres;
 
 CREATE OR REPLACE VIEW public.seller_order_items_view
-WITH (security_barrier = true, security_invoker = false) AS
+WITH (security_barrier = true, security_invoker = true) AS
   SELECT
     oi.id,
     oi.order_id,
@@ -2955,81 +2955,88 @@ REVOKE ALL ON FUNCTION public.vote_review_helpful(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.vote_review_helpful(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.vote_review_helpful(UUID) TO service_role;
 
--- Table & View Privileges: Strict least-privilege isolation
--- seller_shops privilege isolation (Table-level revocation strips all privileges on table and all columns)
-REVOKE ALL ON TABLE public.seller_shops FROM PUBLIC, anon;
+-- Table & View Privileges: reset inherited/legacy grants before applying least privilege.
+-- REVOKE ALL is essential: GRANT of a narrow set does not remove old explicit TRUNCATE/DDL grants.
+REVOKE ALL ON TABLE
+  public.seller_shops, public.customer_profiles, public.products, public.cart_items,
+  public.orders, public.order_items, public.order_idempotency_keys, public.reviews,
+  public.review_helpful_votes, public.wishlist_items, public.sarvex_admin_allowlist,
+  public.categories
+FROM PUBLIC, anon, authenticated;
+
 GRANT SELECT, INSERT, UPDATE ON TABLE public.seller_shops TO authenticated;
-GRANT ALL ON TABLE public.seller_shops TO service_role;
-
--- customer_profiles privilege isolation
-REVOKE ALL ON TABLE public.customer_profiles FROM PUBLIC, anon;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.customer_profiles TO authenticated;
-GRANT ALL ON TABLE public.customer_profiles TO service_role;
-
--- products privilege isolation
-REVOKE ALL ON TABLE public.products FROM PUBLIC;
-GRANT SELECT ON TABLE public.products TO anon, authenticated, service_role;
+GRANT SELECT ON TABLE public.products TO anon, authenticated;
 GRANT INSERT, UPDATE, DELETE ON TABLE public.products TO authenticated;
-GRANT ALL ON TABLE public.products TO service_role;
-
--- cart_items privilege isolation
-REVOKE ALL ON TABLE public.cart_items FROM PUBLIC, anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.cart_items TO authenticated;
-GRANT ALL ON TABLE public.cart_items TO service_role;
-
--- orders privilege isolation
-REVOKE ALL ON TABLE public.orders FROM PUBLIC, anon;
 GRANT SELECT ON TABLE public.orders TO authenticated;
-GRANT ALL ON TABLE public.orders TO service_role;
-
--- order_items privilege isolation
-REVOKE ALL ON TABLE public.order_items FROM PUBLIC, anon;
 GRANT SELECT ON TABLE public.order_items TO authenticated;
 GRANT UPDATE (item_status) ON TABLE public.order_items TO authenticated;
-GRANT ALL ON TABLE public.order_items TO service_role;
-
--- order_idempotency_keys privilege isolation
-REVOKE ALL ON TABLE public.order_idempotency_keys FROM PUBLIC, anon;
-GRANT SELECT, INSERT ON TABLE public.order_idempotency_keys TO authenticated;
-GRANT ALL ON TABLE public.order_idempotency_keys TO service_role;
-
--- reviews privilege isolation
-REVOKE ALL ON TABLE public.reviews FROM PUBLIC;
-GRANT SELECT ON TABLE public.reviews TO anon, authenticated, service_role;
+GRANT SELECT ON TABLE public.order_idempotency_keys TO authenticated;
+GRANT SELECT ON TABLE public.reviews TO anon, authenticated;
 GRANT INSERT, UPDATE, DELETE ON TABLE public.reviews TO authenticated;
-GRANT ALL ON TABLE public.reviews TO service_role;
+GRANT SELECT ON TABLE public.review_helpful_votes TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.wishlist_items TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.sarvex_admin_allowlist TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.categories TO authenticated;
+GRANT SELECT ON TABLE public.categories TO anon;
 
--- review_helpful_votes privilege isolation (Protects voter user IDs from anonymous harvesting)
-REVOKE ALL ON TABLE public.review_helpful_votes FROM PUBLIC, anon;
-GRANT SELECT, INSERT ON TABLE public.review_helpful_votes TO authenticated;
-GRANT ALL ON TABLE public.review_helpful_votes TO service_role;
+-- Public seller discovery exposes only the columns projected by the safe sellers view.
+GRANT SELECT (id, shop_name, owner_name, city, state, pincode, approval_status, rating, created_at)
+  ON TABLE public.seller_shops TO anon;
 
--- wishlist_items privilege isolation
-REVOKE ALL ON TABLE public.wishlist_items FROM PUBLIC, anon;
-GRANT SELECT, INSERT, DELETE ON TABLE public.wishlist_items TO authenticated;
-GRANT ALL ON TABLE public.wishlist_items TO service_role;
+GRANT ALL ON TABLE
+  public.seller_shops, public.customer_profiles, public.products, public.cart_items,
+  public.orders, public.order_items, public.order_idempotency_keys, public.reviews,
+  public.review_helpful_votes, public.wishlist_items, public.sarvex_admin_allowlist,
+  public.categories
+TO service_role;
 
--- sarvex_admin_allowlist privilege isolation
-REVOKE ALL ON TABLE public.sarvex_admin_allowlist FROM PUBLIC, anon;
-GRANT SELECT ON TABLE public.sarvex_admin_allowlist TO authenticated;
-GRANT ALL ON TABLE public.sarvex_admin_allowlist TO service_role;
+-- Compatibility views execute with caller privileges and respect underlying RLS.
+REVOKE ALL ON TABLE public.profiles, public.sellers, public.seller_order_items_view
+  FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.profiles TO authenticated;
+GRANT SELECT ON TABLE public.sellers TO anon, authenticated;
+GRANT SELECT ON TABLE public.seller_order_items_view TO authenticated;
+GRANT ALL ON TABLE public.profiles, public.sellers, public.seller_order_items_view TO service_role;
 
--- categories privilege isolation
-REVOKE ALL ON TABLE public.categories FROM PUBLIC;
-GRANT SELECT ON TABLE public.categories TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.categories TO service_role;
+-- Function privileges: only three read-only helpers are callable anonymously for public RLS.
+REVOKE ALL ON FUNCTION public.is_sarvex_admin() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_sarvex_admin() TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.is_seller_shop_owner(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_seller_shop_owner(UUID) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.is_approved_seller_shop(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_approved_seller_shop(UUID) TO anon, authenticated, service_role;
 
--- profiles view: Authenticated users view their own profile; anonymous access blocked
-REVOKE ALL ON TABLE public.profiles FROM PUBLIC, anon;
-GRANT SELECT ON TABLE public.profiles TO authenticated, service_role;
+-- Authenticated-only helper/RPC functions; never expose order/purchase predicates to anon.
+REVOKE ALL ON FUNCTION public.claim_sarvex_admin_seat() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_sarvex_admin_seat() TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.has_verified_purchase(UUID, UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.has_verified_purchase(UUID, UUID) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.order_has_seller_item(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.order_has_seller_item(UUID) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.is_order_customer(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.is_order_customer(UUID) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.place_sarvex_order(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.place_sarvex_order(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.place_sarvex_order(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.place_sarvex_order(TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, TEXT) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.vote_review_helpful(UUID) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.vote_review_helpful(UUID) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.bootstrap_first_admin() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.bootstrap_first_admin() TO service_role;
 
--- sellers view: Public discovery for approved shops only
-REVOKE ALL ON TABLE public.sellers FROM PUBLIC;
-GRANT SELECT ON TABLE public.sellers TO anon, authenticated, service_role;
-
--- seller_order_items_view: Authenticated sellers and platform admins only (NO anon access)
-REVOKE ALL ON TABLE public.seller_order_items_view FROM PUBLIC, anon;
-GRANT SELECT ON TABLE public.seller_order_items_view TO authenticated, service_role;
+-- Trigger-only SECURITY DEFINER functions must not be callable as browser RPCs.
+REVOKE ALL ON FUNCTION public.handle_new_sarvex_user() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.protect_customer_account_role() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.protect_seller_shop_status() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.protect_product_fields() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.protect_order_item_fields() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.protect_and_verify_review() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.sync_parent_order_status() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.sync_product_review_stats() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.sync_review_helpful_count() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.set_updated_at() FROM PUBLIC, anon, authenticated;
 
 -- ============================================================================
 -- 15. ROW LEVEL SECURITY (RLS) POLICIES — IDEMPOTENT & RECURSION-FREE
@@ -3087,6 +3094,11 @@ DROP POLICY IF EXISTS "Sellers and Admins view seller shops" ON public.seller_sh
 CREATE POLICY "Sellers and Admins view seller shops"
   ON public.seller_shops FOR SELECT
   USING ((auth.uid() IS NOT NULL AND owner_id = auth.uid()) OR public.is_sarvex_admin());
+
+DROP POLICY IF EXISTS "Public can view approved seller shops" ON public.seller_shops;
+CREATE POLICY "Public can view approved seller shops"
+  ON public.seller_shops FOR SELECT
+  USING (approval_status = 'approved');
 
 DROP POLICY IF EXISTS "Authenticated users can register a shop" ON public.seller_shops;
 CREATE POLICY "Authenticated users can register a shop"
@@ -3172,6 +3184,7 @@ CREATE POLICY "Customers and Admins view relevant orders"
   ON public.orders FOR SELECT
   USING (
     (auth.uid() IS NOT NULL AND customer_id = auth.uid())
+    OR public.order_has_seller_item(id)
     OR public.is_sarvex_admin()
   );
 
