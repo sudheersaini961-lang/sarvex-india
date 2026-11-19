@@ -72,32 +72,6 @@ export const INITIAL_REVIEWS: Review[] = [];
 export const INITIAL_ORDERS: Order[] = [];
 
 
-function getCheckoutIdempotencyKey(payload: Record<string, unknown>): string {
-  const storageKey = 'sarvex_pending_checkout_v1';
-  const fingerprint = JSON.stringify(payload);
-  if (typeof window !== 'undefined') {
-    try {
-      const existing = localStorage.getItem(storageKey);
-      if (existing) {
-        const parsed = JSON.parse(existing) as { fingerprint?: string; key?: string };
-        if (parsed.fingerprint === fingerprint && parsed.key) return parsed.key;
-      }
-      const key = generateUuid();
-      localStorage.setItem(storageKey, JSON.stringify({ fingerprint, key }));
-      return key;
-    } catch {
-      // If browser storage is unavailable, this attempt still gets a unique key.
-    }
-  }
-  return generateUuid();
-}
-
-function clearCheckoutIdempotencyKey(): void {
-  if (typeof window !== 'undefined') {
-    try { localStorage.removeItem('sarvex_pending_checkout_v1'); } catch { /* storage may be disabled */ }
-  }
-}
-
 export interface MarketplaceState {
   currentUser: UserProfile | null;
   activeRole: UserRole;
@@ -674,8 +648,9 @@ export function useMarketplace() {
     }
   };
 
-  // Real Cash on Delivery Order placement (orders & order_items tables)
-  const placeOrder = async (orderData: {
+  // Checkout is intentionally fail-closed until the production schema,
+  // payment collection, delivery, returns/refunds and reconciliation are verified.
+  const placeOrder = async (_orderData: {
     customerName: string;
     customerPhone: string;
     customerEmail?: string;
@@ -684,116 +659,7 @@ export function useMarketplace() {
     state: string;
     pincode: string;
   }): Promise<Order> => {
-    // Fail closed: checkout must remain unavailable until payment, fulfilment,
-    // returns/refunds, COD remittance and production database controls are verified.
-    void orderData;
-    throw new Error('SARVEX checkout is temporarily unavailable. Orders will open after payment, delivery, returns and database safeguards are verified.');
-
-    const orderUuid = generateUuid();
-    const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, '');
-    const randPart = generateUuid().replace(/-/g, '').slice(0, 8).toUpperCase();
-    const orderCode = `SRX-${datePart}-${randPart}`;
-
-    // Security: Require authenticated user for COD orders
-    const supabase = getSupabase();
-    if (!supabase) {
-      throw new Error('Supabase is not connected. Order placement is disabled until the real database is configured.');
-    }
-    if (!globalState.currentUser?.id || !isUuid(globalState.currentUser.id)) {
-      throw new Error('Authentication required: Please log in or create an account to place a Cash on Delivery order.');
-    }
-    if (globalState.cart.length === 0) {
-      throw new Error('Your cart is empty. Add a real product before placing an order.');
-    }
-
-    const orderItems: OrderItem[] = globalState.cart.map((c) => ({
-      id: generateUuid(),
-      productId: c.product.id,
-      sellerId: c.product.sellerId,
-      title: c.product.title,
-      price: c.product.price,
-      quantity: c.quantity,
-      imageUrl: c.product.imageUrl
-    }));
-
-    const total = globalState.cart.reduce(
-      (sum, item) => sum + item.product.price * item.quantity,
-      0
-    );
-
-    const newOrder: Order = {
-      id: orderCode, // Unique collision-resistant order code
-      customerId: globalState.currentUser?.id || generateUuid(),
-      customerName: orderData.customerName,
-      customerPhone: orderData.customerPhone,
-      customerEmail: orderData.customerEmail,
-      shippingAddress: orderData.shippingAddress,
-      city: orderData.city,
-      state: orderData.state,
-      pincode: orderData.pincode,
-      items: orderItems,
-      totalAmount: total,
-      paymentMethod: 'cod',
-      status: 'placed',
-      statusHistory: [
-        {
-          status: 'placed',
-          timestamp: new Date().toISOString(),
-          note: 'Order placed successfully with Cash on Delivery (COD).'
-        }
-      ],
-      createdAt: new Date().toISOString()
-    };
-
-    // Execute server-side transactional order placement via RPC if connected to Supabase
-    if (supabase) {
-      const basePayload = {
-        p_customer_name: orderData.customerName,
-        p_customer_phone: orderData.customerPhone,
-        p_customer_email: orderData.customerEmail || '',
-        p_shipping_address: orderData.shippingAddress,
-        p_city: orderData.city,
-        p_state: orderData.state,
-        p_pincode: orderData.pincode,
-        p_items: globalState.cart.map((c) => ({
-          product_id: c.product.id,
-          quantity: c.quantity
-        }))
-      };
-      const rpcPayload = {
-        ...basePayload,
-        // Reuse the same key when the same checkout is retried after a network failure.
-        p_idempotency_key: getCheckoutIdempotencyKey(basePayload)
-      };
-
-      const { data: rpcRes, error: rpcErr } = await supabase.rpc('place_sarvex_order', rpcPayload);
-      if (rpcErr) {
-        throw new Error(rpcErr.message || 'Server order validation failed. Please check stock and seller approval.');
-      }
-      if (!rpcRes || !rpcRes.order_code) {
-        throw new Error('The database did not confirm the order. No local order was created.');
-      }
-      newOrder.id = rpcRes.order_code;
-      newOrder.databaseId = rpcRes.order_id;
-      if (rpcRes.total_amount !== undefined && rpcRes.total_amount !== null) {
-        newOrder.totalAmount = Number(rpcRes.total_amount);
-      }
-      clearCheckoutIdempotencyKey();
-    }
-
-    // Update product stock locally
-    globalState.cart.forEach((c) => {
-      const prod = globalState.products.find((p) => p.id === c.product.id);
-      if (prod) {
-        prod.stock = Math.max(0, prod.stock - c.quantity);
-      }
-    });
-
-    globalState.orders.unshift(newOrder);
-    globalState.cart = [];
-    notify();
-
-    return newOrder;
+    throw new Error('SARVEX checkout is temporarily unavailable. No order has been placed.');
   };
 
   const updateOrderStatus = async (orderId: string, nextStatus: OrderStatus, note?: string) => {
