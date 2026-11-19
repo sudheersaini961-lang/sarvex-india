@@ -49,6 +49,18 @@ ALTER TABLE public.seller_shops ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.cart_items ENABLE ROW LEVEL SECURITY;
 
+-- Existing timestamp trigger helper has no fixed search_path (the live advisor finding).
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $legacy_timestamp$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END
+$legacy_timestamp$;
+
+
 -- Exact legacy policies inspected on the connected Live database.
 CREATE POLICY customer_profiles_create_policy ON public.customer_profiles FOR INSERT
   WITH CHECK ((SELECT auth.uid()) IS NOT NULL);
