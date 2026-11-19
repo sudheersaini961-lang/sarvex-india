@@ -4,6 +4,9 @@
 DO $smoke$
 DECLARE
   v_table text;
+  v_test_user_id uuid := gen_random_uuid();
+  v_profile_role text;
+  v_profile_name text;
   v_required_tables text[] := ARRAY[
     'customer_profiles',
     'seller_shops',
@@ -105,6 +108,40 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'seller-kyc-documents' AND public = false) THEN
     RAISE EXCEPTION 'Expected private seller-kyc-documents bucket is missing or public';
   END IF;
+
+  IF to_regprocedure('public.handle_new_sarvex_user()') IS NULL
+     OR NOT EXISTS (
+       SELECT 1 FROM pg_trigger
+       WHERE tgrelid = 'auth.users'::regclass
+         AND tgname = 'on_auth_user_created_sarvex'
+         AND NOT tgisinternal
+         AND tgenabled <> 'D'
+     ) THEN
+    RAISE EXCEPTION 'Secure Auth signup profile-provisioning trigger is missing or disabled';
+  END IF;
+
+  -- Verify real Auth INSERT provisioning and reject privilege escalation from user metadata.
+  INSERT INTO auth.users (id, email, email_confirmed_at, raw_user_meta_data)
+  VALUES (
+    v_test_user_id,
+    'sarvex-signup-smoke-' || v_test_user_id::text || '@example.invalid',
+    now(),
+    jsonb_build_object('full_name', 'SARVEX Signup Smoke', 'account_role', 'admin', 'phone', '9999999999')
+  );
+
+  SELECT account_role, display_name
+  INTO v_profile_role, v_profile_name
+  FROM public.customer_profiles
+  WHERE owner_id = v_test_user_id;
+
+  IF v_profile_role IS DISTINCT FROM 'customer'
+     OR v_profile_name IS DISTINCT FROM 'SARVEX Signup Smoke' THEN
+    RAISE EXCEPTION 'Auth signup provisioning failed or accepted untrusted role metadata (role: %, name: %)',
+      v_profile_role, v_profile_name;
+  END IF;
+
+  DELETE FROM public.customer_profiles WHERE owner_id = v_test_user_id;
+  DELETE FROM auth.users WHERE id = v_test_user_id;
 END
 $smoke$;
 
