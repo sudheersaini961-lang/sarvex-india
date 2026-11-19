@@ -442,9 +442,71 @@ export function useMarketplace() {
     if (supabase && password) {
       try {
         if (isSignUp) {
-          return { success: false, message: 'New account registration is temporarily paused until secure database profile provisioning is deployed and verified.' };
+          const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+            email: email.trim(),
+            password: password.trim(),
+            options: {
+              data: {
+                full_name: fullName.trim(),
+                phone: phone.trim(),
+                // This is an application preference only. The database trigger always creates a customer.
+                requested_account_type: requestedRole === 'seller' ? 'seller' : 'customer'
+              }
+            }
+          });
+
+          if (signUpError) {
+            return { success: false, message: signUpError.message };
+          }
+          if (!signUpData.user) {
+            return { success: false, message: 'SARVEX could not confirm account creation. Please try again.' };
+          }
+
+          // The on_auth_user_created_sarvex trigger creates a customer profile.
+          // Never trust signup metadata to grant seller or admin permissions.
+          if (signUpData.session) {
+            const userId = signUpData.user.id;
+            const { data: profile, error: profileError } = await supabase
+              .from('customer_profiles')
+              .select('display_name, phone')
+              .eq('owner_id', userId)
+              .maybeSingle();
+
+            if (profileError || !profile) {
+              await supabase.auth.signOut();
+              return {
+                success: false,
+                message: 'Account creation started, but SARVEX could not verify the customer profile. Please contact support before trying again.'
+              };
+            }
+
+            const realRole = await getVerifiedMarketplaceRole(supabase, userId);
+            globalState.currentUser = {
+              id: userId,
+              email: signUpData.user.email || email.trim(),
+              fullName: profile.display_name || email.split('@')[0],
+              phone: profile.phone || '',
+              role: realRole,
+              createdAt: signUpData.user.created_at || new Date().toISOString()
+            };
+            globalState.activeRole = realRole;
+            notify();
+            return {
+              success: true,
+              message: requestedRole === 'seller'
+                ? 'Customer account created. Sign in and submit your seller application for admin approval.'
+                : 'Your SARVEX customer account is ready.'
+            };
+          }
+
+          return {
+            success: true,
+            message: requestedRole === 'seller'
+              ? 'Account created. Verify your email, then sign in to submit a seller application. Seller access starts only after admin approval.'
+              : 'Account created. Please verify your email using the link sent to your inbox before signing in.'
+          };
         } else {
-          // 2. Real Supabase Auth Sign In
+          // Real Supabase Auth Sign In
           const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
             email: email.trim(),
             password: password.trim()
