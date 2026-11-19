@@ -63,59 +63,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg('');
     setErrorMsg('SARVEX checkout is temporarily unavailable. No order has been placed.');
-    return;
-
-    if (!currentUser) {
-      setErrorMsg('Checkout is paused. No order can be submitted at this time.');
-      if (onOpenAuth) {
-        onOpenAuth();
-      }
-      return;
-    }
-
-    if (!fullName.trim() || !phone.trim() || !address.trim() || !city.trim() || !pincode.trim()) {
-      setErrorMsg('Please fill in all delivery details.');
-      return;
-    }
-
-    if (phone.replace(/\D/g, '').length < 10) {
-      setErrorMsg('Please enter a valid 10-digit Indian phone number.');
-      return;
-    }
-
-    if (pincode.trim().length !== 6) {
-      setErrorMsg('Please enter a valid 6-digit postal PIN code.');
-      return;
-    }
-
-    if (cart.length === 0) {
-      setErrorMsg('Your cart is empty.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const order = await placeOrder({
-        customerName: fullName.trim(),
-        customerPhone: phone.trim(),
-        customerEmail: currentUser?.email,
-        shippingAddress: address.trim(),
-        city: city.trim(),
-        state,
-        pincode: pincode.trim()
-      });
-
-      setIsSubmitting(false);
-      onClose();
-      onOrderSuccess(order);
-    } catch (err: any) {
-      setIsSubmitting(false);
-      setErrorMsg(err?.message || 'Could not place order. Please try again.');
-    }
   };
 
   return (
