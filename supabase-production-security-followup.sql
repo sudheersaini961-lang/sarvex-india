@@ -23,7 +23,7 @@ GRANT SELECT (id, owner_id, shop_name, owner_name, city, state, pincode,
   ON TABLE public.seller_shops TO anon;
 DROP POLICY IF EXISTS "Public can view approved seller shops" ON public.seller_shops;
 CREATE POLICY "Public can view approved seller shops"
-  ON public.seller_shops FOR SELECT TO anon
+  ON public.seller_shops FOR SELECT TO public
   USING (approval_status = 'approved');
 GRANT SELECT ON TABLE public.sellers TO anon, authenticated;
 
