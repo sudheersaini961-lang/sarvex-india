@@ -484,7 +484,7 @@ export function useMarketplace() {
         if (isSignUp) {
           const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
             email: email.trim(),
-            password: password.trim(),
+            password,
             options: {
               data: {
                 full_name: fullName.trim(),
@@ -549,7 +549,7 @@ export function useMarketplace() {
           // Real Supabase Auth Sign In
           const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
             email: email.trim(),
-            password: password.trim()
+            password
           });
 
           if (authErr) {
