@@ -27,33 +27,9 @@ CREATE POLICY "Public can view approved seller shops"
   USING (approval_status = 'approved');
 GRANT SELECT ON TABLE public.sellers TO anon, authenticated;
 
--- The seller-order predicate must require an approved shop, not just ownership.
-CREATE OR REPLACE FUNCTION public.order_has_seller_item(check_order_id UUID)
-RETURNS BOOLEAN
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = pg_catalog, public, auth, pg_temp
-AS $function$
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.order_items oi
-    JOIN public.seller_shops s ON s.id = oi.seller_shop_id
-    WHERE oi.order_id = check_order_id
-      AND s.owner_id = auth.uid()
-      AND s.approval_status = 'approved'
-      AND auth.uid() IS NOT NULL
-  );
-$function$;
-REVOKE ALL ON FUNCTION public.order_has_seller_item(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.order_has_seller_item(UUID) TO authenticated, service_role;
-
--- A security-invoker seller order view needs an explicit RLS path for sellers.
--- The helper checks approved-shop ownership of at least one item in the order.
-DROP POLICY IF EXISTS "Sellers can view orders for their own items" ON public.orders;
-CREATE POLICY "Sellers can view orders for their own items"
-  ON public.orders FOR SELECT TO authenticated
-  USING (public.order_has_seller_item(id));
+-- The security-invoker seller-order view relies on the existing
+-- "Customers and Sellers view relevant orders" and "View order items" RLS
+-- policies, which already restrict rows to the customer, owning seller, or admin.
 GRANT SELECT ON TABLE public.seller_order_items_view TO authenticated;
 
 -- Three narrowly scoped, read-only predicates remain callable by anon for
