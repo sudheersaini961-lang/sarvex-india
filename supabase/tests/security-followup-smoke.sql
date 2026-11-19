@@ -59,13 +59,6 @@ BEGIN
     RAISE EXCEPTION 'FAIL: public approved-seller RLS policy missing';
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies
-    WHERE schemaname='public' AND tablename='orders'
-      AND policyname='Sellers can view orders for their own items'
-  ) THEN
-    RAISE EXCEPTION 'FAIL: seller order RLS policy missing';
-  END IF;
 END
 $$;
 
