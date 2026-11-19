@@ -303,7 +303,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
-AS $
+AS $$
 BEGIN
   INSERT INTO public.customer_profiles (owner_id, display_name, email, phone, account_role)
   VALUES (
@@ -320,18 +320,18 @@ BEGIN
 
   RETURN NEW;
 END;
-$;
+$$;
 ALTER FUNCTION public.handle_new_sarvex_user() OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.handle_new_sarvex_user() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.handle_new_sarvex_user() TO service_role;
 
-DO $
+DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_auth_admin') THEN
     EXECUTE 'GRANT EXECUTE ON FUNCTION public.handle_new_sarvex_user() TO supabase_auth_admin';
   END IF;
 END
-$;
+$$;
 DROP TRIGGER IF EXISTS on_auth_user_created_sarvex ON auth.users;
 CREATE TRIGGER on_auth_user_created_sarvex
   AFTER INSERT ON auth.users
