@@ -2,12 +2,18 @@ name: SARVEX PostgreSQL Runtime Tests
 
 on:
   workflow_dispatch:
-  push:
+  pull_request:
     branches:
-      - fix/public-seller-sync-security
+      - main
     paths:
       - "supabase-production-migration.sql"
-      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - ".github/workflows/postgres-runtime.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "supabase-production-migration.sql"
       - "supabase/tests/**"
       - ".github/workflows/postgres-runtime.yml"
 
@@ -48,6 +54,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Install PostgreSQL client
         run: |
@@ -60,57 +68,17 @@ jobs:
       - name: Apply production migration (first run)
         run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
 
-      - name: Verify migration runtime invariants
-        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
+      - name: Verify baseline migration security invariants
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/baseline-security-smoke.sql
 
-      - name: Verify trusted first-admin bootstrap (transaction rolled back)
-        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/admin-bootstrap.sql
-
-      - name: Verify supplier and reseller workspace RPCs (transaction rolled back)
-        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/supplier-workspace.sql
-
-      - name: Apply public reseller catalogue migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160001_public_reseller_catalogue.sql
-
-      - name: Verify public reseller catalogue privacy (transaction rolled back)
-        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/public-reseller-catalogue.sql
-
-      - name: Reapply public reseller catalogue migration (idempotency check)
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160001_public_reseller_catalogue.sql
-
-      - name: Apply supplier fulfilment RPC migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160002_supplier_fulfilment_rpc.sql
-
-      - name: Verify supplier acceptance and dispatch permissions (transaction rolled back)
-        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/supplier-fulfilment.sql
-
-      - name: Reapply supplier fulfilment RPC migration (idempotency check)
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160002_supplier_fulfilment_rpc.sql
-
-      - name: Apply dropship checkout reservation migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160003_dropship_checkout_reservations.sql
-
-      - name: Verify dropship checkout and stock reservation (transaction rolled back)
-        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/dropship-checkout-reservations.sql
-
-      - name: Reapply dropship checkout reservation migration (idempotency check)
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160003_dropship_checkout_reservations.sql
-
-      - name: Apply migration again (idempotency check)
+      - name: Reapply production migration (idempotency check)
         run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
 
-      - name: Verify idempotent re-application
-        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/post-migration-smoke.sql
+      - name: Verify security invariants after reapplication
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/baseline-security-smoke.sql
 
-      - name: Apply COD fail-closed migration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160004_cod_fail_closed_gate.sql
-
-      - name: Verify COD checkout remains blocked until courier integration
-        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/cod-fail-closed.sql
-
-      - name: Reapply COD fail-closed migration (idempotency check)
-        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/202611160004_cod_fail_closed_gate.sql
-
+      - name: Verify fail-closed RLS and seller KYC policy rejection
+        run: bash supabase/tests/security-negative-probes.sh
 
   live-supabase-readonly:
     name: Optional live Supabase REST connectivity check

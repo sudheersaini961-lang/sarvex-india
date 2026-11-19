@@ -44,16 +44,16 @@ BEGIN
     ('public', 'customer_profiles', 'Users view own profile or admin', 'SELECT', 'public', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s*=\s*owner_id\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$', NULL),
     ('public', 'customer_profiles', 'Users can create their own profile', 'INSERT', 'public', 'PERMISSIVE',
-     NULL, '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s*=\s*owner_id\)?\s*and\s*\(?\(?account_role\s+is\s+null\s*or\s*account_role\s*=\s*''customer''(::text)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?\)?\)?[\s\(\)]*$'),
+     NULL, '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s*=\s*owner_id\)?\s*and\s*\(?\(?account_role\s+is\s+null\)?\s*or\s*\(?account_role\s*=\s*''customer''(::text)?\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?\)?\)?[\s\(\)]*$'),
     ('public', 'customer_profiles', 'Users can update their own profile details', 'UPDATE', 'public', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s*=\s*owner_id\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$',
      '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s*=\s*owner_id\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$'),
 
     -- seller_shops
     ('public', 'seller_shops', 'Sellers and Admins view seller shops', 'SELECT', 'public', 'PERMISSIVE',
-     '^[\s\(\)]*\(?\(?\(?(auth\.)?uid\(\)\s+is\s+not\s+null\s*and\s*\(?owner_id\s*=\s*(auth\.)?uid\(\)\)?\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$', NULL),
+     '^[\s\(\)]*(auth\.)?uid\(\)\s+is\s+not\s+null[\s\(\)]*and[\s\(\)]*owner_id\s*=\s*(auth\.)?uid\(\)[\s\(\)]*or[\s\(\)]*(public\.)?is_sarvex_admin\(\)[\s\(\)]*$', NULL),
     ('public', 'seller_shops', 'Authenticated users can register a shop', 'INSERT', 'public', 'PERMISSIVE',
-     NULL, '^[\s\(\)]*\(?\(?approval_status\s*=\s*''pending''(::text)?\s*and\s*\(?(auth\.)?uid\(\)\s*=\s*owner_id\)?\)?\)?[\s\(\)]*$'),
+      NULL, '^[\s\(\)]*\(?\(?approval_status\s*=\s*''pending''(::text)?\)?\s*and\s*\(?\(?(auth\.)?uid\(\)\s*=\s*owner_id\)?\)?\)?[\s\(\)]*$'),
     ('public', 'seller_shops', 'Sellers can update their own shop details', 'UPDATE', 'public', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?owner_id\s*=\s*(auth\.)?uid\(\)\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$',
      '^[\s\(\)]*\(?\(?owner_id\s*=\s*(auth\.)?uid\(\)\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$'),
@@ -84,7 +84,7 @@ BEGIN
 
     -- orders
     ('public', 'orders', 'Customers and Admins view relevant orders', 'SELECT', 'public', 'PERMISSIVE',
-     '^[\s\(\)]*\(?\(?\(?(auth\.)?uid\(\)\s+is\s+not\s+null\s*and\s*\(?customer_id\s*=\s*(auth\.)?uid\(\)\)?\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$', NULL),
+      '^[\s\(\)]*\(*\s*(auth\.)?uid\(\)\s+is\s+not\s+null\s*\)*\s+and\s+\(*\s*customer_id\s*=\s*(auth\.)?uid\(\)\s*\)*\s*\)*\s+or\s+\(*\s*(public\.)?is_sarvex_admin\(\)\s*\)*\s*\)*[\s\(\)]*$', NULL),
     ('public', 'orders', 'Customers and Sellers view relevant orders', 'SELECT', 'public', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?\(?(auth\.)?uid\(\)\s+is\s+not\s+null\s*and\s*\(?customer_id\s*=\s*(auth\.)?uid\(\)\)?\)?\s*or\s*\(?(public\.)?is_seller_shop_owner\(.*\)\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$', NULL),
     ('public', 'orders', 'Only admins or trusted procedures create orders', 'INSERT', 'public', 'PERMISSIVE',
@@ -97,7 +97,7 @@ BEGIN
 
     -- order_items
     ('public', 'order_items', 'View order items', 'SELECT', 'public', 'PERMISSIVE',
-     '^[\s\(\)]*\(?\(?\(?(auth\.)?uid\(\)\s+is\s+not\s+null\s*and\s*\(?(public\.)?is_order_customer\(\s*order_id\s*\)\)?\)?\s*or\s*\(?(public\.)?is_seller_shop_owner\(\s*seller_shop_id\s*\)\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$', NULL),
+      '^[\s\(\)]*(auth\.)?uid\(\)[\s\(\)]*is[\s\(\)]*not[\s\(\)]*null[\s\(\)]*and[\s\(\)]*(public\.)?is_order_customer\(\s*order_id\s*\)[\s\(\)]*or[\s\(\)]*(public\.)?is_seller_shop_owner\(\s*seller_shop_id\s*\)[\s\(\)]*or[\s\(\)]*(public\.)?is_sarvex_admin\(\)[\s\(\)]*$', NULL),
     ('public', 'order_items', 'Only admins or trusted procedures insert order items', 'INSERT', 'public', 'PERMISSIVE',
      NULL, '^[\s\(\)]*\(?(public\.)?is_sarvex_admin\(\)\)?[\s\(\)]*$'),
     ('public', 'order_items', 'Customers insert order items for their own orders', 'INSERT', 'public', 'PERMISSIVE',
@@ -110,7 +110,7 @@ BEGIN
     ('public', 'reviews', 'Public can view all reviews', 'SELECT', 'public', 'PERMISSIVE',
      '^[\s\(\)]*true[\s\(\)]*$', NULL),
     ('public', 'reviews', 'Verified buyers can submit reviews', 'INSERT', 'public', 'PERMISSIVE',
-     NULL, '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s+is\s+not\s+null\s*and\s*\(?customer_id\s*=\s*(auth\.)?uid\(\)\)?\)?\)?[\s\(\)]*$'),
+      NULL, '^[\s\(\)]*(auth\.)?uid\(\)[\s\(\)]*is[\s\(\)]*not[\s\(\)]*null[\s\(\)]*and[\s\(\)]*customer_id[\s\(\)]*=[\s\(\)]*(auth\.)?uid\(\)[\s\(\)]*$'),
     ('public', 'reviews', 'Customers can update their own reviews', 'UPDATE', 'public', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s*=\s*customer_id\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$',
      '^[\s\(\)]*\(?\(?(auth\.)?uid\(\)\s*=\s*customer_id\)?\s*or\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$'),
@@ -173,10 +173,10 @@ BEGIN
     ('storage', 'objects', 'Sellers view own KYC documents', 'SELECT', 'authenticated', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?\(?\(?storage\.foldername\(name\)\)?\[1\]\s*=\s*\(?(auth\.)?uid\(\)\)?::text\)?\)?[\s\(\)]*$', NULL),
     ('storage', 'objects', 'Sellers update own KYC documents', 'UPDATE', 'authenticated', 'PERMISSIVE',
-     '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?\(?\(?storage\.foldername\(name\)\)?\[1\]\s*=\s*\(?(auth\.)?uid\(\)\)?::text\)?\)?(\s*and\s*not\s*\(?exists\s*\(.*seller_shops.*approval_status\s*=\s*''approved''.*\)\)?\)?)*[\s\(\)]*$',
-     '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?\(?\(?storage\.foldername\(name\)\)?\[1\]\s*=\s*\(?(auth\.)?uid\(\)\)?::text\)?\)?(\s*and\s*not\s*\(?exists\s*\(.*seller_shops.*approval_status\s*=\s*''approved''.*\)\)?\)?)*[\s\(\)]*$'),
+     '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?\(?\(?storage\.foldername\(name\)\)?\[1\]\s*=\s*\(?(auth\.)?uid\(\)\)?::text\)?\)?(\s*and\s*\(?not\s*\(?exists\s*\(.*seller_shops.*owner_id\s*=\s*(auth\.)?uid\(\).*approval_status\s*=\s*''approved''.*\)[\s\(\)]*)?[\s\(\)]*$',
+     '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?\(?\(?storage\.foldername\(name\)\)?\[1\]\s*=\s*\(?(auth\.)?uid\(\)\)?::text\)?\)?(\s*and\s*\(?not\s*\(?exists\s*\(.*seller_shops.*owner_id\s*=\s*(auth\.)?uid\(\).*approval_status\s*=\s*''approved''.*\)[\s\(\)]*)?[\s\(\)]*$'),
     ('storage', 'objects', 'Sellers delete own KYC documents', 'DELETE', 'authenticated', 'PERMISSIVE',
-     '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?\(?\(?storage\.foldername\(name\)\)?\[1\]\s*=\s*\(?(auth\.)?uid\(\)\)?::text\)?\)?(\s*and\s*not\s*\(?exists\s*\(.*seller_shops.*approval_status\s*=\s*''approved''.*\)\)?\)?)*[\s\(\)]*$', NULL),
+     '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?\(?\(?storage\.foldername\(name\)\)?\[1\]\s*=\s*\(?(auth\.)?uid\(\)\)?::text\)?\)?(\s*and\s*\(?not\s*\(?exists\s*\(.*seller_shops.*owner_id\s*=\s*(auth\.)?uid\(\).*approval_status\s*=\s*''approved''.*\)[\s\(\)]*)?[\s\(\)]*$', NULL),
     ('storage', 'objects', 'Admins manage all KYC documents', 'ALL', 'authenticated', 'PERMISSIVE',
      '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$',
      '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$');
@@ -233,6 +233,17 @@ BEGIN
         AND s.cmd = pol.cmd
         AND s.permissive = pol.permissive
         AND pol.roles::text[] = ARRAY[s.target_role]
+        -- The KYC update policy must always prevent edits after seller approval.
+        -- Require the ownership and approved-status exclusion in BOTH USING and WITH CHECK.
+        AND (
+          pol.policyname <> 'Sellers update own KYC documents'
+          OR (
+            pol.qual IS NOT NULL
+            AND pol.qual ~* 'not.*exists.*seller_shops.*owner_id\s*=\s*(auth\.)?uid\(\).*approval_status\s*=\s*''approved'''
+            AND pol.with_check IS NOT NULL
+            AND pol.with_check ~* 'not.*exists.*seller_shops.*owner_id\s*=\s*(auth\.)?uid\(\).*approval_status\s*=\s*''approved'''
+          )
+        )
         AND (
           (s.qual_pattern IS NULL AND pol.qual IS NULL) OR
           (s.qual_pattern IS NOT NULL AND pol.qual IS NOT NULL AND pol.qual ~* s.qual_pattern)
