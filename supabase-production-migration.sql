@@ -181,6 +181,53 @@ BEGIN
      '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$',
      '^[\s\(\)]*\(?\(?bucket_id\s*=\s*''seller-kyc-documents''(::text)?\)?\s*and\s*\(?(public\.)?is_sarvex_admin\(\)\)?\)?[\s\(\)]*$');
 
+  -- Explicitly retire only the exact, catalog-verified legacy policies found on the
+  -- existing SARVEX starter schema. Any same-named policy with a different definition
+  -- is NOT dropped; it remains for the strict verifier below to reject.
+  CREATE TEMP TABLE IF NOT EXISTS sarvex_legacy_policy_specs (
+    tablename text NOT NULL,
+    policyname text NOT NULL,
+    cmd text NOT NULL,
+    roles text[] NOT NULL,
+    qual text,
+    with_check text
+  ) ON COMMIT DROP;
+
+  INSERT INTO sarvex_legacy_policy_specs (tablename, policyname, cmd, roles, qual, with_check)
+  VALUES
+    ('cart_items', 'cart_items_create_policy', 'INSERT', ARRAY['public'], NULL, '(( SELECT auth.uid() AS uid) IS NOT NULL)'),
+    ('cart_items', 'cart_items_delete_policy', 'DELETE', ARRAY['public'], '(owner_id = ( SELECT auth.uid() AS uid))', NULL),
+    ('cart_items', 'cart_items_read_policy', 'SELECT', ARRAY['public'], '(owner_id = ( SELECT auth.uid() AS uid))', NULL),
+    ('cart_items', 'cart_items_update_policy', 'UPDATE', ARRAY['public'], '(owner_id = ( SELECT auth.uid() AS uid))', '(owner_id = ( SELECT auth.uid() AS uid))'),
+    ('customer_profiles', 'customer_profiles_create_policy', 'INSERT', ARRAY['public'], NULL, '(( SELECT auth.uid() AS uid) IS NOT NULL)'),
+    ('customer_profiles', 'customer_profiles_delete_policy', 'DELETE', ARRAY['public'], '(owner_id = ( SELECT auth.uid() AS uid))', NULL),
+    ('customer_profiles', 'customer_profiles_read_policy', 'SELECT', ARRAY['public'], '(owner_id = ( SELECT auth.uid() AS uid))', NULL),
+    ('customer_profiles', 'customer_profiles_update_policy', 'UPDATE', ARRAY['public'], '(owner_id = ( SELECT auth.uid() AS uid))', '(owner_id = ( SELECT auth.uid() AS uid))'),
+    ('products', 'products_create_policy', 'INSERT', ARRAY['public'], NULL, '(( SELECT auth.uid() AS uid) IS NOT NULL)'),
+    ('products', 'products_delete_policy', 'DELETE', ARRAY['public'], '(( SELECT auth.uid() AS uid) IS NOT NULL)', NULL),
+    ('products', 'products_read_policy', 'SELECT', ARRAY['public'], '(( SELECT auth.uid() AS uid) IS NOT NULL)', NULL),
+    ('products', 'products_update_policy', 'UPDATE', ARRAY['public'], '(( SELECT auth.uid() AS uid) IS NOT NULL)', '(( SELECT auth.uid() AS uid) IS NOT NULL)'),
+    ('seller_shops', 'seller_shops_create_policy', 'INSERT', ARRAY['public'], NULL, '(( SELECT auth.uid() AS uid) IS NOT NULL)'),
+    ('seller_shops', 'seller_shops_delete_policy', 'DELETE', ARRAY['public'], '(owner_id = ( SELECT auth.uid() AS uid))', NULL),
+    ('seller_shops', 'seller_shops_read_policy', 'SELECT', ARRAY['public'], '(owner_id = ( SELECT auth.uid() AS uid))', NULL),
+    ('seller_shops', 'seller_shops_update_policy', 'UPDATE', ARRAY['public'], '(owner_id = ( SELECT auth.uid() AS uid))', '(owner_id = ( SELECT auth.uid() AS uid))');
+
+  FOR pol IN
+    SELECT p.schemaname, p.tablename, p.policyname
+    FROM pg_policies p
+    JOIN sarvex_legacy_policy_specs s
+      ON s.tablename = p.tablename
+     AND s.policyname = p.policyname
+     AND s.cmd = p.cmd
+     AND s.roles = p.roles::text[]
+     AND s.qual IS NOT DISTINCT FROM p.qual
+     AND s.with_check IS NOT DISTINCT FROM p.with_check
+    WHERE p.schemaname = 'public'
+  LOOP
+    EXECUTE format('DROP POLICY %I ON %I.%I', pol.policyname, pol.schemaname, pol.tablename);
+    RAISE NOTICE 'Removed exact insecure legacy policy "%" on %.%', pol.policyname, pol.schemaname, pol.tablename;
+  END LOOP;
+
   -- Scan existing policies on SARVEX tables and compare against approved catalog
   FOR pol IN (
     SELECT schemaname, tablename, policyname, permissive, cmd, roles, qual, with_check
@@ -3427,5 +3474,15 @@ BEGIN
       );
   END IF;
 END $$;
+
+-- Harden the legacy timestamp trigger function flagged by Supabase Security Advisor.
+-- This is safe for the existing no-argument trigger function and keeps object lookup deterministic.
+DO $sarvex_harden_search_path$
+BEGIN
+  IF to_regprocedure('public.set_updated_at()') IS NOT NULL THEN
+    EXECUTE 'ALTER FUNCTION public.set_updated_at() SET search_path = pg_catalog, public, pg_temp';
+  END IF;
+END
+$sarvex_harden_search_path$;
 
 COMMIT;
