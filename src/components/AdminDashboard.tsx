@@ -143,7 +143,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <p className="text-[10px] text-gray-500">
                       Location: {seller.city}, {seller.state} ({seller.pincode})
                     </p>
-                    <p className="text-[10px] text-gray-500 font-mono">UPI: {seller.upiId}</p>
                   </div>
                   <span className="text-[10px] font-bold bg-amber-200 text-amber-900 px-2 py-0.5 rounded-full">
                     Needs Verification
