@@ -34,7 +34,7 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = pg_catalog, public, auth, pg_temp
-AS $
+AS $function$
   SELECT EXISTS (
     SELECT 1
     FROM public.order_items oi
@@ -44,7 +44,7 @@ AS $
       AND s.approval_status = 'approved'
       AND auth.uid() IS NOT NULL
   );
-$;
+$function$;
 REVOKE ALL ON FUNCTION public.order_has_seller_item(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.order_has_seller_item(UUID) TO authenticated, service_role;
 
