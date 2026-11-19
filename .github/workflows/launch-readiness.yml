@@ -1,6 +1,16 @@
 name: SARVEX Launch Readiness Checks
 
 on:
+  push:
+    branches:
+      - "fix/launch-readiness-truthful-checkout"
+    paths:
+      - "src/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig*.json"
+      - "vite.config.*"
+      - ".github/workflows/launch-readiness.yml"
   pull_request:
     branches:
       - main
