@@ -296,6 +296,50 @@ ALTER TABLE IF EXISTS public.customer_profiles
   ADD COLUMN IF NOT EXISTS address TEXT,
   ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 
+-- Secure Auth signup provisioning: every new Auth user receives a customer-only profile.
+-- The role is never copied from user metadata; account_role always uses the DB default.
+CREATE OR REPLACE FUNCTION public.handle_new_sarvex_user()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $
+BEGIN
+  INSERT INTO public.customer_profiles (owner_id, display_name, email, phone, account_role)
+  VALUES (
+    NEW.id,
+    COALESCE(
+      NULLIF(trim(NEW.raw_user_meta_data ->> 'full_name'), ''),
+      NULLIF(trim(NEW.raw_user_meta_data ->> 'name'), '')
+    ),
+    NEW.email,
+    NULLIF(trim(NEW.raw_user_meta_data ->> 'phone'), ''),
+    'customer'
+  )
+  ON CONFLICT (owner_id) DO NOTHING;
+
+  RETURN NEW;
+END;
+$;
+
+ALTER FUNCTION public.handle_new_sarvex_user() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.handle_new_sarvex_user() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.handle_new_sarvex_user() TO service_role;
+
+DO $
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_auth_admin') THEN
+    EXECUTE 'GRANT EXECUTE ON FUNCTION public.handle_new_sarvex_user() TO supabase_auth_admin';
+  END IF;
+END
+$;
+
+DROP TRIGGER IF EXISTS on_auth_user_created_sarvex ON auth.users;
+CREATE TRIGGER on_auth_user_created_sarvex
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_sarvex_user();
+
 -- Idempotent Catalog-Verified Hardening of UNIQUE (owner_id) on customer_profiles
 DO $$
 DECLARE
