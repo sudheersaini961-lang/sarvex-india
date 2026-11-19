@@ -63,57 +63,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg('');
-
-    if (!currentUser) {
-      setErrorMsg('Authentication required: Please log in or create an account to place a Cash on Delivery order.');
-      if (onOpenAuth) {
-        onOpenAuth();
-      }
-      return;
-    }
-
-    if (!fullName.trim() || !phone.trim() || !address.trim() || !city.trim() || !pincode.trim()) {
-      setErrorMsg('Please fill in all delivery details.');
-      return;
-    }
-
-    if (phone.replace(/\D/g, '').length < 10) {
-      setErrorMsg('Please enter a valid 10-digit Indian phone number.');
-      return;
-    }
-
-    if (pincode.trim().length !== 6) {
-      setErrorMsg('Please enter a valid 6-digit postal PIN code.');
-      return;
-    }
-
-    if (cart.length === 0) {
-      setErrorMsg('Your cart is empty.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const order = await placeOrder({
-        customerName: fullName.trim(),
-        customerPhone: phone.trim(),
-        customerEmail: currentUser?.email,
-        shippingAddress: address.trim(),
-        city: city.trim(),
-        state,
-        pincode: pincode.trim()
-      });
-
-      setIsSubmitting(false);
-      onClose();
-      onOrderSuccess(order);
-    } catch (err: any) {
-      setIsSubmitting(false);
-      setErrorMsg(err?.message || 'Could not place order. Please try again.');
-    }
+    setErrorMsg('SARVEX checkout is temporarily unavailable. No order has been placed.');
   };
 
   return (
@@ -124,9 +76,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div>
             <h3 className="font-bold text-base flex items-center gap-1.5">
               <Truck size={18} className="text-orange-400" />
-              Cash on Delivery Checkout
+              Checkout temporarily unavailable
             </h3>
-            <p className="text-[11px] text-blue-200">Doorstep Delivery • Pay When Received</p>
+            <p className="text-[11px] text-blue-200">Orders are paused until payment and delivery safeguards are ready</p>
           </div>
           <button
             onClick={onClose}
@@ -149,7 +101,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-amber-900 flex items-center gap-1.5">
-                  <ShieldCheck size={16} className="text-[#f97316]" /> Login Required for COD
+                  <ShieldCheck size={16} className="text-[#f97316]" /> Checkout is paused
                 </span>
                 {onOpenAuth && (
                   <button
@@ -162,7 +114,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 )}
               </div>
               <p className="text-[11px] text-amber-800 leading-tight">
-                To prevent fraudulent dispatches, Cash on Delivery orders require verified customer authentication.
+                Checkout will reopen only after database, payment and delivery safeguards are verified.
               </p>
             </div>
           )}
@@ -274,19 +226,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           </div>
 
-          {/* Payment Method Selector (100% Free COD) */}
+          {/* Checkout status */}
           <div className="border border-emerald-200 bg-emerald-50/60 rounded-xl p-3.5 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
                 <ShieldCheck size={16} className="text-emerald-600" />
-                Payment Method: Cash on Delivery
+                Checkout is not active
               </span>
               <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center">
                 <Check size={12} strokeWidth={3} />
               </span>
             </div>
             <p className="text-[11px] text-emerald-800 leading-normal">
-              Zero advance payment. Pay ₹{cartTotalAmount.toLocaleString('en-IN')} in cash or scan delivery agent’s UPI QR code when package is delivered to your hands.
+              No payment will be collected and no order can be submitted while checkout is disabled.
             </p>
           </div>
 
@@ -319,7 +271,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isSubmitting || cart.length === 0}
+              disabled={true}
               className="w-full py-3.5 bg-gradient-to-r from-[#ea580c] to-[#f97316] hover:from-orange-600 hover:to-orange-700 text-white font-black text-sm rounded-xl shadow-lg transition tap-effect flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isSubmitting ? (
@@ -327,7 +279,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               ) : (
                 <>
                   <CheckCircle size={18} />
-                  <span>Place Cash on Delivery Order (₹{cartTotalAmount.toLocaleString('en-IN')})</span>
+                  <span>Checkout unavailable — no order can be placed</span>
                 </>
               )}
             </button>

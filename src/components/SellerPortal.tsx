@@ -123,7 +123,7 @@ export const SellerPortal: React.FC = () => {
         mrp: Number(newMrp),
         stock: Number(newStock) || 0,
         imageUrl: newImageUrl.trim(),
-        isCodAvailable: true,
+        isCodAvailable: false,
         isFeatured: false
       });
       setProductSuccessMsg(`"${newTitle}" database mein save ho gaya.`);
@@ -481,7 +481,7 @@ export const SellerPortal: React.FC = () => {
               <div className="text-center py-10 bg-white rounded-xl border border-gray-200 p-4">
                 <Truck size={32} className="mx-auto text-gray-400 mb-2" />
                 <h4 className="font-bold text-gray-800 text-sm">No pending orders</h4>
-                <p className="text-xs text-gray-500">When customers place COD orders, they appear here.</p>
+                <p className="text-xs text-gray-500">Order fulfilment will appear here after secure checkout and delivery workflows are activated.</p>
               </div>
             ) : (
               <div className="space-y-3">

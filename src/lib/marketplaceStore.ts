@@ -13,6 +13,16 @@ import {
 } from '../types/marketplace';
 import { getSupabase, generateUuid, isUuid } from './supabaseClient';
 
+// Keep all marketplace writes disabled until the hardened production migration
+// is deployed and independently verified against the live Supabase project.
+const MARKETPLACE_WRITES_ENABLED = false;
+
+function assertMarketplaceWritesEnabled(): void {
+  if (!MARKETPLACE_WRITES_ENABLED) {
+    throw new Error('SARVEX marketplace actions are temporarily paused until database security and operational checks are complete.');
+  }
+}
+
 // Standard Categories
 export const INITIAL_CATEGORIES: Category[] = [
   {
@@ -71,32 +81,6 @@ export const INITIAL_PRODUCTS: Product[] = [];
 export const INITIAL_REVIEWS: Review[] = [];
 export const INITIAL_ORDERS: Order[] = [];
 
-
-function getCheckoutIdempotencyKey(payload: Record<string, unknown>): string {
-  const storageKey = 'sarvex_pending_checkout_v1';
-  const fingerprint = JSON.stringify(payload);
-  if (typeof window !== 'undefined') {
-    try {
-      const existing = localStorage.getItem(storageKey);
-      if (existing) {
-        const parsed = JSON.parse(existing) as { fingerprint?: string; key?: string };
-        if (parsed.fingerprint === fingerprint && parsed.key) return parsed.key;
-      }
-      const key = generateUuid();
-      localStorage.setItem(storageKey, JSON.stringify({ fingerprint, key }));
-      return key;
-    } catch {
-      // If browser storage is unavailable, this attempt still gets a unique key.
-    }
-  }
-  return generateUuid();
-}
-
-function clearCheckoutIdempotencyKey(): void {
-  if (typeof window !== 'undefined') {
-    try { localStorage.removeItem('sarvex_pending_checkout_v1'); } catch { /* storage may be disabled */ }
-  }
-}
 
 export interface MarketplaceState {
   currentUser: UserProfile | null;
@@ -157,7 +141,7 @@ export function useMarketplace() {
 
       try {
         // 1. Fetch Sellers / Seller Shops (from existing seller_shops table)
-        const { data: dbShops, error: shopsError } = await supabase.from('seller_shops').select('*');
+        const { data: dbShops, error: shopsError } = await supabase.from('seller_shops').select('id, owner_id, shop_name, owner_name, phone, email, city, state, pincode, pickup_address, approval_status, commission_rate, rating, created_at');
         if (shopsError) throw shopsError;
         const shopNameMap: Record<string, string> = {};
 
@@ -176,12 +160,9 @@ export function useMarketplace() {
               state: s.state || '',
               pincode: s.pincode || '',
               pickupAddress: s.pickup_address || '',
-              bankAccount: s.bank_account || '',
-              ifscCode: s.ifsc_code || '',
-              upiId: s.upi_id || '',
               status: (s.approval_status || s.status || 'pending') as any,
               commissionRate: Number(s.commission_rate || 0),
-              rating: Number(s.rating || 4.8),
+              rating: Number(s.rating ?? 0),
               createdAt: s.created_at || new Date().toISOString()
             };
           });
@@ -213,7 +194,7 @@ export function useMarketplace() {
               badge: p.badge || undefined,
               rating: Number(p.rating ?? 0),
               ratingCount: Number(p.rating_count ?? 0),
-              isCodAvailable: true,
+              isCodAvailable: false,
               isFeatured: Boolean(p.is_featured),
               createdAt: p.created_at || new Date().toISOString()
             };
@@ -251,7 +232,8 @@ export function useMarketplace() {
             .eq('owner_id', authUser.id)
             .maybeSingle();
 
-          const assignedRole = (profile?.account_role || 'customer') as UserRole;
+          // Do not grant elevated UI roles from a client-readable profile column.
+          const assignedRole: UserRole = 'customer';
           globalState.currentUser = {
             id: authUser.id,
             email: authUser.email || '',
@@ -283,7 +265,7 @@ export function useMarketplace() {
           const approvedOwnedShop = globalState.sellers.some((seller) =>
             seller.userId === authUser.id && seller.status === 'approved'
           );
-          if (approvedOwnedShop && assignedRole !== 'admin') {
+          if (MARKETPLACE_WRITES_ENABLED && approvedOwnedShop) {
             const { data: sellerRows, error: sellerRowsError } = await supabase
               .from('seller_order_items_view')
               .select('*');
@@ -384,7 +366,8 @@ export function useMarketplace() {
             .eq('owner_id', authUser.id)
             .maybeSingle();
 
-          const assignedRole = (profile?.account_role || 'customer') as UserRole;
+          // Profile role is user-readable and is not an authorization source.
+          const assignedRole: UserRole = 'customer';
           globalState.currentUser = {
             id: authUser.id,
             email: authUser.email || '',
@@ -434,54 +417,7 @@ export function useMarketplace() {
     if (supabase && password) {
       try {
         if (isSignUp) {
-          // 1. Real Supabase Auth Signup
-          const { data: authData, error: authErr } = await supabase.auth.signUp({
-            email: email.trim(),
-            password: password.trim(),
-            options: {
-              data: {
-                display_name: fullName.trim() || email.split('@')[0],
-                phone: phone.trim()
-              }
-            }
-          });
-
-          if (authErr) {
-            return { success: false, message: authErr.message };
-          }
-
-          const userId = authData.user?.id;
-          if (userId) {
-            // Safe role assignment: default to customer, prevent self-promoting to admin
-            const safeRole: UserRole = 'customer'; // Seller access is granted only after a database-approved shop.
-
-            // Insert into customer_profiles
-            const { error: profileError } = await supabase.from('customer_profiles').upsert({
-              id: generateUuid(),
-              owner_id: userId,
-              display_name: fullName.trim() || email.split('@')[0],
-              email: email.trim(),
-              phone: phone.trim(),
-              account_role: safeRole,
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'owner_id' });
-            if (profileError) {
-              await supabase.auth.signOut();
-              return { success: false, message: `Account profile was not saved: ${profileError.message}` };
-            }
-
-            globalState.currentUser = {
-              id: userId,
-              email: email.trim(),
-              fullName: fullName.trim() || email.split('@')[0],
-              phone: phone.trim(),
-              role: safeRole,
-              createdAt: new Date().toISOString()
-            };
-            globalState.activeRole = safeRole;
-            notify();
-            return { success: true, message: 'Account created successfully in Supabase!' };
-          }
+          return { success: false, message: 'New account registration is temporarily paused until secure database profile provisioning is deployed and verified.' };
         } else {
           // 2. Real Supabase Auth Sign In
           const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
@@ -501,7 +437,9 @@ export function useMarketplace() {
               .eq('owner_id', userId)
               .maybeSingle();
 
-            const realRole = (profile?.account_role || 'customer') as UserRole;
+            // Never trust a client-readable profile role to grant seller/admin access.
+            // Role elevation requires a separately verified server-side authorization path.
+            const realRole: UserRole = 'customer';
             globalState.currentUser = {
               id: userId,
               email: email.trim(),
@@ -576,7 +514,7 @@ export function useMarketplace() {
 
     // Sync to Supabase cart_items table if user is logged in
     const supabase = getSupabase();
-    if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
+    if (MARKETPLACE_WRITES_ENABLED && supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
       try {
         await supabase.from('cart_items').upsert({
           id: generateUuid(),
@@ -603,7 +541,7 @@ export function useMarketplace() {
     notify();
 
     const supabase = getSupabase();
-    if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
+    if (MARKETPLACE_WRITES_ENABLED && supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
       try {
         if (quantity <= 0) {
           await supabase.from('cart_items').delete().eq('owner_id', globalState.currentUser.id).eq('product_id', productId);
@@ -624,7 +562,7 @@ export function useMarketplace() {
     notify();
 
     const supabase = getSupabase();
-    if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
+    if (MARKETPLACE_WRITES_ENABLED && supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
       try {
         await supabase.from('cart_items').delete().eq('owner_id', globalState.currentUser.id).eq('product_id', productId);
       } catch (e) {
@@ -638,7 +576,7 @@ export function useMarketplace() {
     notify();
 
     const supabase = getSupabase();
-    if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
+    if (MARKETPLACE_WRITES_ENABLED && supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
       try {
         await supabase.from('cart_items').delete().eq('owner_id', globalState.currentUser.id);
       } catch (e) {
@@ -657,7 +595,7 @@ export function useMarketplace() {
     notify();
 
     const supabase = getSupabase();
-    if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
+    if (MARKETPLACE_WRITES_ENABLED && supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
       try {
         if (globalState.wishlistIds.includes(productId)) {
           await supabase.from('wishlist_items').upsert({
@@ -674,8 +612,9 @@ export function useMarketplace() {
     }
   };
 
-  // Real Cash on Delivery Order placement (orders & order_items tables)
-  const placeOrder = async (orderData: {
+  // Checkout is intentionally fail-closed until the production schema,
+  // payment collection, delivery, returns/refunds and reconciliation are verified.
+  const placeOrder = async (_orderData: {
     customerName: string;
     customerPhone: string;
     customerEmail?: string;
@@ -684,114 +623,11 @@ export function useMarketplace() {
     state: string;
     pincode: string;
   }): Promise<Order> => {
-    const orderUuid = generateUuid();
-    const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, '');
-    const randPart = generateUuid().replace(/-/g, '').slice(0, 8).toUpperCase();
-    const orderCode = `SRX-${datePart}-${randPart}`;
-
-    // Security: Require authenticated user for COD orders
-    const supabase = getSupabase();
-    if (!supabase) {
-      throw new Error('Supabase is not connected. Order placement is disabled until the real database is configured.');
-    }
-    if (!globalState.currentUser?.id || !isUuid(globalState.currentUser.id)) {
-      throw new Error('Authentication required: Please log in or create an account to place a Cash on Delivery order.');
-    }
-    if (globalState.cart.length === 0) {
-      throw new Error('Your cart is empty. Add a real product before placing an order.');
-    }
-
-    const orderItems: OrderItem[] = globalState.cart.map((c) => ({
-      id: generateUuid(),
-      productId: c.product.id,
-      sellerId: c.product.sellerId,
-      title: c.product.title,
-      price: c.product.price,
-      quantity: c.quantity,
-      imageUrl: c.product.imageUrl
-    }));
-
-    const total = globalState.cart.reduce(
-      (sum, item) => sum + item.product.price * item.quantity,
-      0
-    );
-
-    const newOrder: Order = {
-      id: orderCode, // Unique collision-resistant order code
-      customerId: globalState.currentUser?.id || generateUuid(),
-      customerName: orderData.customerName,
-      customerPhone: orderData.customerPhone,
-      customerEmail: orderData.customerEmail,
-      shippingAddress: orderData.shippingAddress,
-      city: orderData.city,
-      state: orderData.state,
-      pincode: orderData.pincode,
-      items: orderItems,
-      totalAmount: total,
-      paymentMethod: 'cod',
-      status: 'placed',
-      statusHistory: [
-        {
-          status: 'placed',
-          timestamp: new Date().toISOString(),
-          note: 'Order placed successfully with Cash on Delivery (COD).'
-        }
-      ],
-      createdAt: new Date().toISOString()
-    };
-
-    // Execute server-side transactional order placement via RPC if connected to Supabase
-    if (supabase) {
-      const basePayload = {
-        p_customer_name: orderData.customerName,
-        p_customer_phone: orderData.customerPhone,
-        p_customer_email: orderData.customerEmail || '',
-        p_shipping_address: orderData.shippingAddress,
-        p_city: orderData.city,
-        p_state: orderData.state,
-        p_pincode: orderData.pincode,
-        p_items: globalState.cart.map((c) => ({
-          product_id: c.product.id,
-          quantity: c.quantity
-        }))
-      };
-      const rpcPayload = {
-        ...basePayload,
-        // Reuse the same key when the same checkout is retried after a network failure.
-        p_idempotency_key: getCheckoutIdempotencyKey(basePayload)
-      };
-
-      const { data: rpcRes, error: rpcErr } = await supabase.rpc('place_sarvex_order', rpcPayload);
-      if (rpcErr) {
-        throw new Error(rpcErr.message || 'Server order validation failed. Please check stock and seller approval.');
-      }
-      if (!rpcRes || !rpcRes.order_code) {
-        throw new Error('The database did not confirm the order. No local order was created.');
-      }
-      newOrder.id = rpcRes.order_code;
-      newOrder.databaseId = rpcRes.order_id;
-      if (rpcRes.total_amount !== undefined && rpcRes.total_amount !== null) {
-        newOrder.totalAmount = Number(rpcRes.total_amount);
-      }
-      clearCheckoutIdempotencyKey();
-    }
-
-    // Update product stock locally
-    globalState.cart.forEach((c) => {
-      const prod = globalState.products.find((p) => p.id === c.product.id);
-      if (prod) {
-        prod.stock = Math.max(0, prod.stock - c.quantity);
-      }
-    });
-
-    globalState.orders.unshift(newOrder);
-    globalState.cart = [];
-    notify();
-
-    return newOrder;
+    throw new Error('SARVEX checkout is temporarily unavailable. No order has been placed.');
   };
 
   const updateOrderStatus = async (orderId: string, nextStatus: OrderStatus, note?: string) => {
+    assertMarketplaceWritesEnabled();
     const supabase = getSupabase();
     if (!supabase) throw new Error('Supabase is not connected. Order status cannot be changed offline.');
     const order = globalState.orders.find((item) => item.id === orderId || item.databaseId === orderId);
@@ -828,6 +664,7 @@ export function useMarketplace() {
 
   // Seller Management (seller_shops table)
   const registerSeller = async (sellerData: Omit<Seller, 'id' | 'status' | 'commissionRate' | 'rating' | 'createdAt'>): Promise<Seller> => {
+    assertMarketplaceWritesEnabled();
     const supabase = getSupabase();
     const ownerId = globalState.currentUser?.id;
     if (!supabase || !ownerId || !isUuid(ownerId)) {
@@ -867,6 +704,7 @@ export function useMarketplace() {
   };
 
   const approveSeller = async (sellerId: string) => {
+    assertMarketplaceWritesEnabled();
     const supabase = getSupabase();
     if (!supabase || globalState.currentUser?.role !== 'admin') {
       throw new Error('Admin authentication and Supabase connection are required.');
@@ -884,6 +722,7 @@ export function useMarketplace() {
   };
 
   const rejectSeller = async (sellerId: string) => {
+    assertMarketplaceWritesEnabled();
     const supabase = getSupabase();
     if (!supabase || globalState.currentUser?.role !== 'admin') {
       throw new Error('Admin authentication and Supabase connection are required.');
@@ -902,6 +741,7 @@ export function useMarketplace() {
 
   // Product Management (products table: id UUID, seller_shop_id, product_name, price_inr, stock_quantity)
   const addProduct = async (productData: Omit<Product, 'id' | 'rating' | 'ratingCount' | 'createdAt'>): Promise<Product> => {
+    assertMarketplaceWritesEnabled();
     const supabase = getSupabase();
     const currentSeller = globalState.sellers.find((seller) =>
       seller.userId === globalState.currentUser?.id && seller.status === 'approved'
@@ -949,6 +789,7 @@ export function useMarketplace() {
   };
 
   const deleteProduct = async (productId: string) => {
+    assertMarketplaceWritesEnabled();
     const supabase = getSupabase();
     if (!supabase || !isUuid(productId)) {
       throw new Error('A connected database and valid product record are required to delete a listing.');
@@ -969,6 +810,7 @@ export function useMarketplace() {
     title: string;
     comment: string;
   }): Promise<Review> => {
+    assertMarketplaceWritesEnabled();
     const supabase = getSupabase();
     const customerId = globalState.currentUser?.id;
     if (!supabase || !customerId || !isUuid(customerId) || !isUuid(productId)) {
@@ -1010,6 +852,7 @@ export function useMarketplace() {
   };
 
   const markReviewHelpful = async (reviewId: string) => {
+    assertMarketplaceWritesEnabled();
     const supabase = getSupabase();
     if (!supabase || !isUuid(reviewId) || !globalState.currentUser) {
       throw new Error('Sign in and connect Supabase before voting on a review.');
