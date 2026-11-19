@@ -3036,7 +3036,6 @@ REVOKE ALL ON FUNCTION public.protect_and_verify_review() FROM PUBLIC, anon, aut
 REVOKE ALL ON FUNCTION public.sync_parent_order_status() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.sync_product_review_stats() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.sync_review_helpful_count() FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.set_updated_at() FROM PUBLIC, anon, authenticated;
 
 -- ============================================================================
 -- 15. ROW LEVEL SECURITY (RLS) POLICIES — IDEMPOTENT & RECURSION-FREE
