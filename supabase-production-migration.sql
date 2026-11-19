@@ -783,6 +783,8 @@ BEGIN
     RAISE NOTICE 'Added constraint cart_items_owner_product_key successfully';
 END $$;
 
+CREATE INDEX IF NOT EXISTS cart_items_owner_id_idx ON public.cart_items(owner_id);
+
 -- ============================================================================
 -- 7. CREATE NEW MARKETPLACE TABLES
 -- ============================================================================
@@ -3318,7 +3320,20 @@ CREATE POLICY "Only admins manage admin allowlist"
 -- ============================================================================
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'storage') THEN
+  -- Supabase owns storage.objects with supabase_storage_admin. Never alter managed
+  -- Storage metadata from the postgres migration role. The same policies are tested
+  -- in CI where the disposable fixture is owned by postgres.
+  IF EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'storage'
+      AND c.relname = 'objects'
+      AND (
+        pg_get_userbyid(c.relowner) = current_user
+        OR EXISTS (SELECT 1 FROM pg_roles WHERE rolname = current_user AND rolsuper)
+      )
+  ) THEN
     -- Ensure product-images bucket exists with 5MB limit and image MIME restrictions
     INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
     VALUES (
@@ -3332,9 +3347,6 @@ BEGIN
       public = true,
       file_size_limit = 5242880,
       allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-
-    -- Enable RLS on storage.objects
-    ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
     -- 1. Public Read: Anyone can view product images
     DROP POLICY IF EXISTS "Public can view product images" ON storage.objects;
@@ -3476,6 +3488,8 @@ BEGIN
       WITH CHECK (
         bucket_id = 'seller-kyc-documents' AND public.is_sarvex_admin()
       );
+  ELSE
+    RAISE NOTICE 'Skipping Storage metadata and policy changes: storage.objects is owned by Supabase. Configure Storage buckets and policies through Supabase Dashboard.';
   END IF;
 END $$;
 
