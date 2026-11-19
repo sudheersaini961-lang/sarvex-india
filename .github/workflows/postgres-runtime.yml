@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        pg: ["15", "16"]
+        pg: ["15", "16", "17"]
     services:
       postgres:
         image: postgres:${{ matrix.pg }}
@@ -76,6 +76,25 @@ jobs:
 
       - name: Verify security invariants after reapplication
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/baseline-security-smoke.sql
+
+      - name: Create isolated legacy-schema upgrade database
+        run: createdb sarvex_legacy
+
+      - name: Reproduce existing Live starter schema and rows
+        run: |
+          psql -d sarvex_legacy -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap-supabase.sql
+          psql -d sarvex_legacy -v ON_ERROR_STOP=1 -f supabase/tests/legacy-live-schema-fixture.sql
+
+      - name: Apply migration to legacy schema and preserve existing records
+        run: |
+          psql -d sarvex_legacy -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
+          psql -d sarvex_legacy -v ON_ERROR_STOP=1 -f supabase/tests/baseline-security-smoke.sql
+          psql -d sarvex_legacy -v ON_ERROR_STOP=1 -f supabase/tests/legacy-upgrade-smoke.sql
+
+      - name: Reapply migration to legacy schema (idempotency)
+        run: |
+          psql -d sarvex_legacy -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
+          psql -d sarvex_legacy -v ON_ERROR_STOP=1 -f supabase/tests/legacy-upgrade-smoke.sql
 
       - name: Verify fail-closed RLS and seller KYC policy rejection
         run: bash supabase/tests/security-negative-probes.sh
