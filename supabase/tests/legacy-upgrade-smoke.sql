@@ -46,6 +46,23 @@ BEGIN
     RAISE EXCEPTION 'anon retains direct marketplace write privileges after migration';
   END IF;
 
+  -- New objects created later by the migration owner must not inherit public-client
+  -- table/sequence privileges or PUBLIC/anon/authenticated function EXECUTE.
+  IF EXISTS (
+    SELECT 1
+    FROM pg_default_acl d
+    CROSS JOIN LATERAL aclexplode(d.defaclacl) a
+    WHERE d.defaclrole = 'postgres'::regrole
+      AND d.defaclnamespace = 'public'::regnamespace
+      AND (
+        (d.defaclobjtype = 'r' AND a.grantee IN (0, 'anon'::regrole, 'authenticated'::regrole))
+        OR (d.defaclobjtype = 'S' AND a.grantee IN ('anon'::regrole, 'authenticated'::regrole))
+        OR (d.defaclobjtype = 'f' AND a.grantee IN (0, 'anon'::regrole, 'authenticated'::regrole))
+      )
+  ) THEN
+    RAISE EXCEPTION 'Public-client default privileges remain for future public objects';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM pg_proc p
     JOIN pg_namespace n ON n.oid=p.pronamespace
