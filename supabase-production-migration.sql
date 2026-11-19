@@ -595,7 +595,9 @@ BEGIN
         -- Verify expression equivalence to: CHECK (mrp IS NULL OR mrp >= price_inr)
         IF v_norm_cdef IN (
             'check mrp is null or mrp >= price_inr',
+            'check mrp is null or mrp >= price_inr::numeric',
             'check mrp >= price_inr or mrp is null',
+            'check mrp >= price_inr::numeric or mrp is null',
             'check mrp is null or price_inr <= mrp',
             'check price_inr <= mrp or mrp is null'
         ) THEN
@@ -619,7 +621,9 @@ BEGIN
         v_norm_cdef := trim(regexp_replace(regexp_replace(lower(v_con_rec.cdef), '[()]', '', 'g'), '\s+', ' ', 'g'));
         IF v_norm_cdef IN (
             'check mrp is null or mrp >= price_inr',
+            'check mrp is null or mrp >= price_inr::numeric',
             'check mrp >= price_inr or mrp is null',
+            'check mrp >= price_inr::numeric or mrp is null',
             'check mrp is null or price_inr <= mrp',
             'check price_inr <= mrp or mrp is null'
         ) THEN
