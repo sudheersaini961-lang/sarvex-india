@@ -23,6 +23,31 @@ function assertMarketplaceWritesEnabled(): void {
   }
 }
 
+// Resolve elevated UI roles only through server-authoritative checks.
+// A profile's account_role column is deliberately never trusted for authorization.
+async function getVerifiedMarketplaceRole(
+  supabase: NonNullable<ReturnType<typeof getSupabase>>,
+  userId: string
+): Promise<UserRole> {
+  try {
+    const { data: isAdmin, error: adminError } = await supabase.rpc('is_sarvex_admin');
+    if (!adminError && isAdmin === true) return 'admin';
+
+    const { data: approvedShops, error: sellerError } = await supabase
+      .from('seller_shops')
+      .select('id')
+      .eq('owner_id', userId)
+      .eq('approval_status', 'approved')
+      .limit(1);
+
+    if (!sellerError && approvedShops && approvedShops.length > 0) return 'seller';
+  } catch {
+    // Missing migration, network failure, or denied query must fail closed to customer.
+  }
+
+  return 'customer';
+}
+
 // Standard Categories
 export const INITIAL_CATEGORIES: Category[] = [
   {
@@ -232,8 +257,8 @@ export function useMarketplace() {
             .eq('owner_id', authUser.id)
             .maybeSingle();
 
-          // Do not grant elevated UI roles from a client-readable profile column.
-          const assignedRole: UserRole = 'customer';
+          // Resolve admin/seller UI access from server-side checks, never profile metadata.
+          const assignedRole = await getVerifiedMarketplaceRole(supabase, authUser.id);
           globalState.currentUser = {
             id: authUser.id,
             email: authUser.email || '',
@@ -366,8 +391,8 @@ export function useMarketplace() {
             .eq('owner_id', authUser.id)
             .maybeSingle();
 
-          // Profile role is user-readable and is not an authorization source.
-          const assignedRole: UserRole = 'customer';
+          // Resolve admin/seller UI access from server-side checks, never profile metadata.
+          const assignedRole = await getVerifiedMarketplaceRole(supabase, authUser.id);
           globalState.currentUser = {
             id: authUser.id,
             email: authUser.email || '',
@@ -437,9 +462,8 @@ export function useMarketplace() {
               .eq('owner_id', userId)
               .maybeSingle();
 
-            // Never trust a client-readable profile role to grant seller/admin access.
-            // Role elevation requires a separately verified server-side authorization path.
-            const realRole: UserRole = 'customer';
+            // Resolve admin/seller UI access from server-side checks, never profile metadata.
+            const realRole = await getVerifiedMarketplaceRole(supabase, userId);
             globalState.currentUser = {
               id: userId,
               email: email.trim(),
