@@ -2955,6 +2955,16 @@ REVOKE ALL ON FUNCTION public.vote_review_helpful(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.vote_review_helpful(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.vote_review_helpful(UUID) TO service_role;
 
+-- Harden defaults as well as existing objects. Supabase's project-level defaults can
+-- otherwise re-grant broad rights to every future public table/function/sequence.
+-- The migration runs as postgres; explicitly remove public-client defaults for that owner.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  REVOKE ALL ON TABLES FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  REVOKE ALL ON SEQUENCES FROM PUBLIC, anon, authenticated;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;
+
 -- Table & View Privileges: reset inherited/legacy grants before applying least privilege.
 -- REVOKE ALL is essential: GRANT of a narrow set does not remove old explicit TRUNCATE/DDL grants.
 REVOKE ALL ON TABLE
