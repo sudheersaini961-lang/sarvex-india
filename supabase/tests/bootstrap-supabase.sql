@@ -53,6 +53,10 @@ CREATE TABLE IF NOT EXISTS storage.objects (
   owner_id uuid
 );
 
+-- In the isolated CI database postgres owns this fixture table; Live Supabase
+-- already enables RLS on its managed storage.objects table.
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
 CREATE OR REPLACE FUNCTION storage.foldername(name text)
 RETURNS text[]
 LANGUAGE sql
