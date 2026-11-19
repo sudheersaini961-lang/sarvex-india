@@ -181,7 +181,7 @@ export function useMarketplace() {
               upiId: s.upi_id || '',
               status: (s.approval_status || s.status || 'pending') as any,
               commissionRate: Number(s.commission_rate || 0),
-              rating: Number(s.rating || 4.8),
+              rating: Number(s.rating ?? 0),
               createdAt: s.created_at || new Date().toISOString()
             };
           });
@@ -213,7 +213,7 @@ export function useMarketplace() {
               badge: p.badge || undefined,
               rating: Number(p.rating ?? 0),
               ratingCount: Number(p.rating_count ?? 0),
-              isCodAvailable: true,
+              isCodAvailable: false,
               isFeatured: Boolean(p.is_featured),
               createdAt: p.created_at || new Date().toISOString()
             };
@@ -684,6 +684,11 @@ export function useMarketplace() {
     state: string;
     pincode: string;
   }): Promise<Order> => {
+    // Fail closed: checkout must remain unavailable until payment, fulfilment,
+    // returns/refunds, COD remittance and production database controls are verified.
+    void orderData;
+    throw new Error('SARVEX checkout is temporarily unavailable. Orders will open after payment, delivery, returns and database safeguards are verified.');
+
     const orderUuid = generateUuid();
     const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, '');
     const randPart = generateUuid().replace(/-/g, '').slice(0, 8).toUpperCase();
