@@ -141,7 +141,7 @@ export function useMarketplace() {
 
       try {
         // 1. Fetch Sellers / Seller Shops (from existing seller_shops table)
-        const { data: dbShops, error: shopsError } = await supabase.from('seller_shops').select('*');
+        const { data: dbShops, error: shopsError } = await supabase.from('seller_shops').select('id, owner_id, shop_name, owner_name, phone, email, city, state, pincode, pickup_address, approval_status, commission_rate, rating, created_at');
         if (shopsError) throw shopsError;
         const shopNameMap: Record<string, string> = {};
 
@@ -160,9 +160,6 @@ export function useMarketplace() {
               state: s.state || '',
               pincode: s.pincode || '',
               pickupAddress: s.pickup_address || '',
-              bankAccount: s.bank_account || '',
-              ifscCode: s.ifsc_code || '',
-              upiId: s.upi_id || '',
               status: (s.approval_status || s.status || 'pending') as any,
               commissionRate: Number(s.commission_rate || 0),
               rating: Number(s.rating ?? 0),
@@ -235,7 +232,8 @@ export function useMarketplace() {
             .eq('owner_id', authUser.id)
             .maybeSingle();
 
-          const assignedRole = (profile?.account_role || 'customer') as UserRole;
+          // Do not grant elevated UI roles from a client-readable profile column.
+          const assignedRole: UserRole = 'customer';
           globalState.currentUser = {
             id: authUser.id,
             email: authUser.email || '',
@@ -267,7 +265,7 @@ export function useMarketplace() {
           const approvedOwnedShop = globalState.sellers.some((seller) =>
             seller.userId === authUser.id && seller.status === 'approved'
           );
-          if (approvedOwnedShop && assignedRole !== 'admin') {
+          if (MARKETPLACE_WRITES_ENABLED && approvedOwnedShop && assignedRole !== 'admin') {
             const { data: sellerRows, error: sellerRowsError } = await supabase
               .from('seller_order_items_view')
               .select('*');
@@ -591,7 +589,7 @@ export function useMarketplace() {
     notify();
 
     const supabase = getSupabase();
-    if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
+    if (MARKETPLACE_WRITES_ENABLED && supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
       try {
         if (quantity <= 0) {
           await supabase.from('cart_items').delete().eq('owner_id', globalState.currentUser.id).eq('product_id', productId);
@@ -612,7 +610,7 @@ export function useMarketplace() {
     notify();
 
     const supabase = getSupabase();
-    if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
+    if (MARKETPLACE_WRITES_ENABLED && supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
       try {
         await supabase.from('cart_items').delete().eq('owner_id', globalState.currentUser.id).eq('product_id', productId);
       } catch (e) {
@@ -626,7 +624,7 @@ export function useMarketplace() {
     notify();
 
     const supabase = getSupabase();
-    if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
+    if (MARKETPLACE_WRITES_ENABLED && supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
       try {
         await supabase.from('cart_items').delete().eq('owner_id', globalState.currentUser.id);
       } catch (e) {
@@ -645,7 +643,7 @@ export function useMarketplace() {
     notify();
 
     const supabase = getSupabase();
-    if (supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
+    if (MARKETPLACE_WRITES_ENABLED && supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
       try {
         if (globalState.wishlistIds.includes(productId)) {
           await supabase.from('wishlist_items').upsert({
