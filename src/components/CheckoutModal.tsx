@@ -70,7 +70,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return;
 
     if (!currentUser) {
-      setErrorMsg('Authentication required: Please log in or create an account to place a Cash on Delivery order.');
+      setErrorMsg('Checkout is paused. No order can be submitted at this time.');
       if (onOpenAuth) {
         onOpenAuth();
       }
@@ -151,7 +151,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-amber-900 flex items-center gap-1.5">
-                  <ShieldCheck size={16} className="text-[#f97316]" /> Login Required for COD
+                  <ShieldCheck size={16} className="text-[#f97316]" /> Checkout is paused
                 </span>
                 {onOpenAuth && (
                   <button
@@ -164,7 +164,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 )}
               </div>
               <p className="text-[11px] text-amber-800 leading-tight">
-                To prevent fraudulent dispatches, Cash on Delivery orders require verified customer authentication.
+                Checkout will reopen only after database, payment and delivery safeguards are verified.
               </p>
             </div>
           )}
@@ -276,7 +276,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           </div>
 
-          {/* Payment Method Selector (100% Free COD) */}
+          {/* Checkout status */}
           <div className="border border-emerald-200 bg-emerald-50/60 rounded-xl p-3.5 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
