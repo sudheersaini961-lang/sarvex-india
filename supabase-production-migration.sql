@@ -321,7 +321,6 @@ BEGIN
   RETURN NEW;
 END;
 $;
-
 ALTER FUNCTION public.handle_new_sarvex_user() OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.handle_new_sarvex_user() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.handle_new_sarvex_user() TO service_role;
@@ -333,7 +332,6 @@ BEGIN
   END IF;
 END
 $;
-
 DROP TRIGGER IF EXISTS on_auth_user_created_sarvex ON auth.users;
 CREATE TRIGGER on_auth_user_created_sarvex
   AFTER INSERT ON auth.users
