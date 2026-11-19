@@ -59,6 +59,10 @@ BEGIN
     RAISE EXCEPTION 'auth.uid() compatibility function is missing';
   END IF;
 
+  IF to_regclass('public.cart_items_owner_id_idx') IS NULL THEN
+    RAISE EXCEPTION 'Expected cart_items(owner_id) lookup index is missing';
+  END IF;
+
   IF to_regprocedure('public.bootstrap_first_admin()') IS NULL THEN
     RAISE EXCEPTION 'Trusted first-admin bootstrap function is missing';
   END IF;
