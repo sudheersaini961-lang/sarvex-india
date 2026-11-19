@@ -22,7 +22,7 @@ interface OrderTrackingModalProps {
 const ORDER_STEPS: { status: OrderStatus; label: string; desc: string }[] = [
   {
     status: 'placed',
-    label: 'Order Placed (COD)',
+    label: 'Order Placed',
     desc: 'The order record was created in the marketplace database.'
   },
   {
@@ -105,7 +105,7 @@ export const OrderTrackingModal: React.FC<OrderTrackingModalProps> = ({
             <div className="text-right">
               <span className="text-[10px] font-bold text-gray-500 uppercase">Payment</span>
               <p className="text-xs font-black text-[#1e3a8a]">
-                ₹{order.totalAmount.toLocaleString('en-IN')} (COD)
+                ₹{order.totalAmount.toLocaleString('en-IN')} • {order.paymentMethod.toUpperCase()}
               </p>
             </div>
           </div>
