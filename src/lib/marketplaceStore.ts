@@ -563,7 +563,7 @@ export function useMarketplace() {
 
     // Sync to Supabase cart_items table if user is logged in
     const supabase = getSupabase();
-    if (MARKETPLACE_WRITES_ENABLED && supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id))
+    if (MARKETPLACE_WRITES_ENABLED && supabase && globalState.currentUser?.id && isUuid(globalState.currentUser.id)) {
       try {
         await supabase.from('cart_items').upsert({
           id: generateUuid(),
