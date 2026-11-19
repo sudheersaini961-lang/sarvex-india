@@ -33,9 +33,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // Keep live product reference so ratings update immediately on review submission
   const currentProduct = products.find((p) => p.id === product.id) || product;
 
-  const [testPin, setTestPin] = useState('');
-  const [pinChecked, setPinChecked] = useState(false);
-  const [addedNotice, setAddedNotice] = useState(false);
+    const [addedNotice, setAddedNotice] = useState(false);
 
   const isWishlisted = wishlistIds.includes(currentProduct.id);
   const discountPercent = Math.round(((currentProduct.mrp - currentProduct.price) / currentProduct.mrp) * 100);
@@ -48,12 +46,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     setTimeout(() => setAddedNotice(false), 2000);
   };
 
-  const handlePincodeCheck = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (testPin.length === 6) {
-      setPinChecked(true);
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col justify-end sm:justify-center items-center">
@@ -146,7 +138,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <p className="text-[11px] text-gray-500 mt-1">Applicable taxes and fees will be confirmed at checkout.</p>
           </div>
 
-          {/* COD & Delivery Check */}
+          {/* Checkout and delivery readiness */}
           <div className="border border-gray-200 rounded-xl p-3.5 space-y-3">
             <div className="flex items-start gap-2.5">
               <div className="p-2 bg-emerald-100 text-emerald-800 rounded-lg">
@@ -154,13 +146,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
               <div className="flex-1">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-gray-900">Cash on Delivery (COD)</h4>
+                  <h4 className="text-xs font-bold text-gray-900">Checkout status</h4>
                   <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
-                    Available
+                    Not available
                   </span>
                 </div>
                 <p className="text-xs text-gray-600 mt-0.5">
-                  Pay with Cash or UPI directly to delivery agent at your doorstep.
+                  Ordering is temporarily disabled while payment collection and delivery operations are being verified.
                 </p>
               </div>
             </div>
@@ -170,44 +162,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <RotateCcw size={18} />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-gray-900">7 Days Easy Return & Refund</h4>
+                <h4 className="text-xs font-bold text-gray-900">Returns and refunds</h4>
                 <p className="text-xs text-gray-600 mt-0.5">
-                  Full refund or doorstep replacement if damaged or wrong item delivered.
+                  Return eligibility, refund timing and replacement support will be published after these workflows are operational.
                 </p>
               </div>
             </div>
 
-            {/* Pincode availability check */}
-            <form onSubmit={handlePincodeCheck} className="pt-2 border-t border-gray-100">
-              <label className="text-[11px] font-bold text-gray-700 block mb-1">
-                Check Delivery Time to Pincode:
-              </label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <MapPin size={15} className="absolute left-2.5 top-2.5 text-gray-400" />
-                  <input
-                    type="text"
-                    pattern="[0-9]{6}"
-                    maxLength={6}
-                    value={testPin}
-                    onChange={(e) => setTestPin(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Enter 6-digit Pincode"
-                    className="w-full text-xs pl-8 pr-2 py-2 border border-gray-300 rounded-lg font-mono focus:ring-1 focus:ring-[#1e3a8a] focus:outline-none"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 text-xs font-bold text-[#1e3a8a] bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100"
-                >
-                  Verify
-                </button>
-              </div>
-              {pinChecked && (
-                <p className="text-[11px] text-emerald-700 font-medium mt-1.5 flex items-center gap-1">
-                  <CheckCircle2 size={12} /> Standard Free Delivery within 2-4 Business Days to PIN {testPin}.
-                </p>
-              )}
-            </form>
+            <div className="pt-2 border-t border-gray-100 text-[11px] text-gray-600">
+              Delivery coverage and delivery dates are not verified yet. Please check back after courier integration is activated.
+            </div>     </form>
           </div>
 
           {/* Description */}
@@ -245,10 +209,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
           <button
             onClick={() => onBuyNow(currentProduct)}
-            disabled={currentProduct.stock === 0}
+            disabled={true}
             className="flex-1 py-3 px-3 bg-gradient-to-r from-[#f97316] to-[#ea580c] hover:from-orange-600 hover:to-orange-700 text-white font-extrabold text-xs rounded-xl shadow-md transition tap-effect flex items-center justify-center gap-1.5 disabled:opacity-50"
           >
-            <span>Buy Now (COD)</span>
+            <span>Checkout unavailable</span>
           </button>
         </div>
       </div>
