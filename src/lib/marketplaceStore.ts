@@ -265,7 +265,7 @@ export function useMarketplace() {
           const approvedOwnedShop = globalState.sellers.some((seller) =>
             seller.userId === authUser.id && seller.status === 'approved'
           );
-          if (MARKETPLACE_WRITES_ENABLED && approvedOwnedShop && assignedRole !== 'admin') {
+          if (MARKETPLACE_WRITES_ENABLED && approvedOwnedShop) {
             const { data: sellerRows, error: sellerRowsError } = await supabase
               .from('seller_order_items_view')
               .select('*');
@@ -418,55 +418,6 @@ export function useMarketplace() {
       try {
         if (isSignUp) {
           return { success: false, message: 'New account registration is temporarily paused until secure database profile provisioning is deployed and verified.' };
-
-          // 1. Real Supabase Auth Signup
-          const { data: authData, error: authErr } = await supabase.auth.signUp({
-            email: email.trim(),
-            password: password.trim(),
-            options: {
-              data: {
-                display_name: fullName.trim() || email.split('@')[0],
-                phone: phone.trim()
-              }
-            }
-          });
-
-          if (authErr) {
-            return { success: false, message: authErr.message };
-          }
-
-          const userId = authData.user?.id;
-          if (userId) {
-            // Safe role assignment: default to customer, prevent self-promoting to admin
-            const safeRole: UserRole = 'customer'; // Seller access is granted only after a database-approved shop.
-
-            // Insert into customer_profiles
-            const { error: profileError } = await supabase.from('customer_profiles').upsert({
-              id: generateUuid(),
-              owner_id: userId,
-              display_name: fullName.trim() || email.split('@')[0],
-              email: email.trim(),
-              phone: phone.trim(),
-              account_role: safeRole,
-              updated_at: new Date().toISOString()
-            }, { onConflict: 'owner_id' });
-            if (profileError) {
-              await supabase.auth.signOut();
-              return { success: false, message: `Account profile was not saved: ${profileError.message}` };
-            }
-
-            globalState.currentUser = {
-              id: userId,
-              email: email.trim(),
-              fullName: fullName.trim() || email.split('@')[0],
-              phone: phone.trim(),
-              role: safeRole,
-              createdAt: new Date().toISOString()
-            };
-            globalState.activeRole = safeRole;
-            notify();
-            return { success: true, message: 'Account created successfully in Supabase!' };
-          }
         } else {
           // 2. Real Supabase Auth Sign In
           const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
