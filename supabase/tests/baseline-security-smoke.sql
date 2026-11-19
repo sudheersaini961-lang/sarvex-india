@@ -53,6 +53,12 @@ BEGIN
        OR has_table_privilege('authenticated', format('public.%I', v_table), 'TRIGGER') THEN
       RAISE EXCEPTION 'authenticated has unsafe structural privileges on public.%', v_table;
     END IF;
+
+    IF has_table_privilege('authenticated', format('public.%I', v_table), 'TRUNCATE')
+       OR has_table_privilege('authenticated', format('public.%I', v_table), 'REFERENCES')
+       OR has_table_privilege('authenticated', format('public.%I', v_table), 'TRIGGER') THEN
+      RAISE EXCEPTION 'authenticated has unsafe structural privileges on public.%', v_table;
+    END IF;
   END LOOP;
 
   IF to_regprocedure('auth.uid()') IS NULL THEN
@@ -84,6 +90,68 @@ BEGIN
   IF has_function_privilege('anon', 'public.place_sarvex_order(text,text,text,text,text,text,text,jsonb)', 'EXECUTE')
      OR has_function_privilege('anon', 'public.place_sarvex_order(text,text,text,text,text,text,text,jsonb,text)', 'EXECUTE') THEN
     RAISE EXCEPTION 'anon must not execute checkout RPCs';
+  END IF;
+
+  IF has_function_privilege('anon', 'public.claim_sarvex_admin_seat()', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.has_verified_purchase(uuid,uuid)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.order_has_seller_item(uuid)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.is_order_customer(uuid)', 'EXECUTE')
+     OR has_function_privilege('anon', 'public.vote_review_helpful(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Sensitive admin, purchase, order, or vote RPC must not be executable by anon';
+  END IF;
+
+  IF NOT has_function_privilege('anon', 'public.is_sarvex_admin()', 'EXECUTE')
+     OR NOT has_function_privilege('anon', 'public.is_seller_shop_owner(uuid)', 'EXECUTE')
+     OR NOT has_function_privilege('anon', 'public.is_approved_seller_shop(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Public read-only RLS helper grants are missing';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname IN (
+        'handle_new_sarvex_user','protect_customer_account_role','protect_seller_shop_status',
+        'protect_product_fields','protect_order_item_fields','protect_and_verify_review',
+        'sync_parent_order_status','sync_product_review_stats','sync_review_helpful_count'
+      )
+      AND (has_function_privilege('anon', p.oid, 'EXECUTE')
+        OR has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+  ) THEN
+    RAISE EXCEPTION 'Trigger-only SECURITY DEFINER functions are exposed as browser RPCs';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_class c
+    JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname='public' AND c.relname IN ('sellers','seller_order_items_view')
+      AND NOT (COALESCE(c.reloptions, ARRAY[]::text[]) @> ARRAY['security_invoker=true'])
+  ) THEN
+    RAISE EXCEPTION 'Compatibility views must run with invoker privileges';
+  END IF;
+
+  IF has_table_privilege('anon','public.sellers','INSERT')
+     OR has_table_privilege('anon','public.sellers','UPDATE')
+     OR has_table_privilege('anon','public.sellers','DELETE')
+     OR has_table_privilege('anon','public.seller_order_items_view','SELECT') THEN
+    RAISE EXCEPTION 'Anonymous compatibility view privileges are too broad';
+  END IF;
+
+  IF NOT has_column_privilege('anon','public.seller_shops','shop_name','SELECT')
+     OR has_column_privilege('anon','public.seller_shops','bank_account','SELECT')
+     OR has_column_privilege('anon','public.seller_shops','ifsc_code','SELECT')
+     OR has_column_privilege('anon','public.seller_shops','upi_id','SELECT')
+     OR has_column_privilege('anon','public.seller_shops','pickup_address','SELECT') THEN
+    RAISE EXCEPTION 'Public seller discovery column privileges are missing or expose private fields';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='public' AND tablename='seller_shops'
+      AND policyname='Public can view approved seller shops'
+      AND cmd='SELECT' AND qual='(approval_status = ''approved''::text)'
+  ) THEN
+    RAISE EXCEPTION 'Approved seller public read policy is missing';
   END IF;
 
   IF EXISTS (
