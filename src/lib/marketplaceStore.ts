@@ -366,7 +366,8 @@ export function useMarketplace() {
             .eq('owner_id', authUser.id)
             .maybeSingle();
 
-          const assignedRole = (profile?.account_role || 'customer') as UserRole;
+          // Profile role is user-readable and is not an authorization source.
+          const assignedRole: UserRole = 'customer';
           globalState.currentUser = {
             id: authUser.id,
             email: authUser.email || '',
