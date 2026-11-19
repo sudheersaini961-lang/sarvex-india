@@ -59,9 +59,9 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
         <div className="bg-emerald-50 px-4 py-2 border-b border-emerald-100 flex items-center justify-between text-xs text-emerald-800 font-medium">
           <span className="flex items-center gap-1.5">
             <Truck size={14} className="text-emerald-600" />
-            <span>Eligible for <strong>FREE Cash On Delivery</strong></span>
+            <span><strong>Checkout is temporarily unavailable</strong></span>
           </span>
-          <span className="text-emerald-700 font-bold">₹0 Shipping</span>
+          <span className="text-emerald-700 font-bold">Delivery not configured</span>
         </div>
 
         {/* Cart items list or empty state */}
@@ -199,7 +199,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               <div className="flex items-center gap-2 p-2.5 bg-blue-50/70 rounded-xl border border-blue-100 text-xs text-[#1e3a8a]">
                 <ShieldCheck size={18} className="shrink-0 text-[#f97316]" />
                 <span className="text-[11px]">
-                  Pay cash at delivery. No prepayment required. Open parcel verification enabled.
+                  Checkout, payment collection, delivery confirmation and returns are not active yet.
                 </span>
               </div>
             </>
@@ -217,18 +217,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 </p>
               </div>
               <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">
-                Cash On Delivery
+                Checkout unavailable
               </span>
             </div>
 
             <button
-              onClick={() => {
-                onClose();
-                onProceedToCheckout();
-              }}
-              className="w-full py-3 bg-[#f97316] hover:bg-orange-600 text-white font-extrabold text-sm rounded-xl shadow-lg transition tap-effect flex items-center justify-center gap-2"
+              disabled={true}
+              disabled={true}
+              className="w-full py-3 bg-gray-300 text-gray-600 font-extrabold text-sm rounded-xl flex items-center justify-center gap-2 cursor-not-allowed"
             >
-              <span>Proceed to Cash on Delivery Checkout</span>
+              <span>Checkout temporarily unavailable</span>
               <ArrowRight size={16} />
             </button>
           </div>
