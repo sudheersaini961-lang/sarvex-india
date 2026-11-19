@@ -147,7 +147,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div className="flex-1">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold text-gray-900">Checkout status</h4>
-                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                  <span className="text-[11px] font-bold text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded">
                     Not available
                   </span>
                 </div>
@@ -171,7 +171,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
             <div className="pt-2 border-t border-gray-100 text-[11px] text-gray-600">
               Delivery coverage and delivery dates are not verified yet. Please check back after courier integration is activated.
-            </div>     </form>
+            </div>
           </div>
 
           {/* Description */}
