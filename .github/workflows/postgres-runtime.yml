@@ -71,6 +71,9 @@ jobs:
       - name: Verify baseline migration security invariants
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/baseline-security-smoke.sql
 
+      - name: Verify COD checkout, stock reservation and idempotency
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/cod-checkout-smoke.sql
+
       - name: Reapply production migration (idempotency check)
         run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
 
@@ -90,6 +93,7 @@ jobs:
           psql -d sarvex_legacy -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
           psql -d sarvex_legacy -v ON_ERROR_STOP=1 -f supabase/tests/baseline-security-smoke.sql
           psql -d sarvex_legacy -v ON_ERROR_STOP=1 -f supabase/tests/legacy-upgrade-smoke.sql
+          psql -d sarvex_legacy -v ON_ERROR_STOP=1 -f supabase/tests/cod-checkout-smoke.sql
 
       - name: Reapply migration to legacy schema (idempotency)
         run: |
