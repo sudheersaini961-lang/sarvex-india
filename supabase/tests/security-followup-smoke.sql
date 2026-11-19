@@ -54,7 +54,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname='public' AND tablename='seller_shops'
-      AND policyname='Public can view approved seller shops' AND roles @> ARRAY['anon']::name[]
+      AND policyname='Public can view approved seller shops' AND roles @> ARRAY['public']::name[]
   ) THEN
     RAISE EXCEPTION 'FAIL: public approved-seller RLS policy missing';
   END IF;
