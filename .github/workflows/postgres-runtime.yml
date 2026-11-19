@@ -77,6 +77,9 @@ jobs:
       - name: Verify security invariants after reapplication
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/baseline-security-smoke.sql
 
+      - name: Verify fail-closed RLS and seller KYC policy rejection
+        run: bash supabase/tests/security-negative-probes.sh
+
   live-supabase-readonly:
     name: Optional live Supabase REST connectivity check
     runs-on: ubuntu-latest
