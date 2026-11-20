@@ -16,6 +16,7 @@ on:
     branches:
       - main
     paths:
+      - ".github/workflows/android-apk.yml"
       - "src/**"
       - "package.json"
       - "package-lock.json"
