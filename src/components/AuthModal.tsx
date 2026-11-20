@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, User, Mail, Phone, Lock, Eye, EyeOff, ShieldCheck, Store, LogIn, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useMarketplace } from '../lib/marketplaceStore';
+import { getSupabase } from '../lib/supabaseClient';
 import { UserRole } from '../types/marketplace';
 
 interface AuthModalProps {
@@ -9,7 +10,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { currentUser, loginUserWithSupabase, logoutUser } = useMarketplace();
+  const { currentUser, loginUserWithSupabase, logoutUser, refreshCurrentUserRole } = useMarketplace();
 
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -21,8 +22,45 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [isAdminSetupLoading, setIsAdminSetupLoading] = useState(false);
+  const [adminSetupMessage, setAdminSetupMessage] = useState('');
+  const [adminSetupError, setAdminSetupError] = useState('');
 
   if (!isOpen) return null;
+
+  const handleInitialAdminSetup = async () => {
+    setAdminSetupMessage('');
+    setAdminSetupError('');
+    const supabase = getSupabase();
+
+    if (!supabase) {
+      setAdminSetupError('Connect the verified SARVEX Supabase project before initial admin setup.');
+      return;
+    }
+
+    setIsAdminSetupLoading(true);
+    try {
+      // The signed-in user's session JWT is sent automatically by Supabase.
+      // The service-role key and allowlisted email remain server-side only.
+      const { data, error } = await supabase.functions.invoke('bootstrap-first-admin', {
+        body: {}
+      });
+
+      if (error) throw new Error(error.message || 'Initial admin verification failed.');
+      if (!data?.success) throw new Error(data?.error || 'Initial admin setup is not available yet.');
+
+      const refreshed = await refreshCurrentUserRole();
+      if (!refreshed) throw new Error('Admin seat was assigned, but the app could not refresh your role. Sign out and sign in again.');
+
+      setAdminSetupMessage(data.already_admin
+        ? 'This account is already the verified SARVEX Admin.'
+        : 'Initial SARVEX Admin access verified successfully.');
+    } catch (error: any) {
+      setAdminSetupError(error?.message || 'Initial admin setup is not deployed or configured yet.');
+    } finally {
+      setIsAdminSetupLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +136,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                   </span>
                 </div>
               </div>
+
+              {currentUser.role !== 'admin' && (
+                <div className="p-3 border border-blue-200 bg-blue-50 rounded-xl space-y-2">
+                  <div className="flex items-center gap-2 text-[#1e3a8a]">
+                    <ShieldCheck size={15} />
+                    <p className="font-bold text-xs">Initial Admin Verification</p>
+                  </div>
+                  <p className="text-[10px] leading-relaxed text-gray-600">
+                    Only the verified email address configured by the SARVEX project owner can claim the one-time first Admin seat. Other accounts are rejected by the server.
+                  </p>
+                  {adminSetupMessage && (
+                    <p role="status" className="text-[11px] text-emerald-800 font-semibold">{adminSetupMessage}</p>
+                  )}
+                  {adminSetupError && (
+                    <p role="alert" className="text-[11px] text-red-700">{adminSetupError}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleInitialAdminSetup}
+                    disabled={isAdminSetupLoading}
+                    className="w-full py-2.5 bg-[#1e3a8a] text-white font-bold rounded-lg disabled:opacity-50"
+                  >
+                    {isAdminSetupLoading ? 'Verifying securely...' : 'Verify Initial Admin Access'}
+                  </button>
+                </div>
+              )}
 
               <button
                 onClick={() => {
