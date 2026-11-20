@@ -77,7 +77,7 @@ DROP POLICY IF EXISTS "Public can view approved seller shops"
 -- follow-up migration. Include every live seller_shops column inspected.
 REVOKE ALL ON TABLE public.seller_shops FROM PUBLIC, anon;
 REVOKE SELECT (
-  id, created_at, updated_at, owner_id, shop_name, approval_status, owner_name,
+  id, created_at, owner_id, shop_name, approval_status, owner_name,
   phone, email, city, state, pincode, pickup_address, upi_id, bank_account,
   ifsc_code, commission_rate, rating
 ) ON TABLE public.seller_shops FROM PUBLIC, anon;
