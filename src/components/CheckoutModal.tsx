@@ -50,7 +50,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOrderSuccess,
   onOpenAuth,
 }) => {
-  const { cart, cartTotalAmount, placeOrder, currentUser } = useMarketplace();
+  const { cart, cartTotalAmount, placeOrder, currentUser, checkoutEnabled } = useMarketplace();
 
   const [fullName, setFullName] = useState(currentUser?.fullName || '');
   const [phone, setPhone] = useState(currentUser?.phone || '');
@@ -63,9 +63,34 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg('SARVEX checkout is temporarily unavailable. No order has been placed.');
+    setErrorMsg('');
+    if (!checkoutEnabled) {
+      setErrorMsg('Checkout is paused until the database security migration is deployed and verified. No order has been placed.');
+      return;
+    }
+    if (!currentUser) {
+      setErrorMsg('Please sign in before placing a Cash on Delivery order.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const order = await placeOrder({
+        customerName: fullName,
+        customerPhone: phone,
+        shippingAddress: address,
+        city,
+        state,
+        pincode
+      });
+      onOrderSuccess(order);
+      onClose();
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'SARVEX could not confirm your order. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -76,9 +101,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div>
             <h3 className="font-bold text-base flex items-center gap-1.5">
               <Truck size={18} className="text-orange-400" />
-              Checkout temporarily unavailable
+              {checkoutEnabled ? 'Secure COD Checkout' : 'Checkout temporarily paused'}
             </h3>
-            <p className="text-[11px] text-blue-200">Orders are paused until payment and delivery safeguards are ready</p>
+            <p className="text-[11px] text-blue-200">{checkoutEnabled ? 'Pay in cash when your order is delivered' : 'Orders remain paused until database safeguards are verified'}</p>
           </div>
           <button
             onClick={onClose}
@@ -114,7 +139,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 )}
               </div>
               <p className="text-[11px] text-amber-800 leading-tight">
-                Checkout will reopen only after database, payment and delivery safeguards are verified.
+                Sign in to your SARVEX account before placing an order.
               </p>
             </div>
           )}
@@ -196,6 +221,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   State *
                 </label>
                 <select
+                  required
                   value={state}
                   onChange={(e) => setState(e.target.value)}
                   className="w-full text-xs px-2.5 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-[#1e3a8a] focus:outline-none"
@@ -226,19 +252,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             </div>
           </div>
 
-          {/* Checkout status */}
-          <div className="border border-emerald-200 bg-emerald-50/60 rounded-xl p-3.5 space-y-2">
+          {/* Cash on Delivery status */}
+          <div className={`rounded-xl p-3.5 space-y-2 border ${checkoutEnabled ? 'border-blue-200 bg-blue-50/60' : 'border-amber-200 bg-amber-50/60'}`}>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
-                <ShieldCheck size={16} className="text-emerald-600" />
-                Checkout is not active
+              <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                <ShieldCheck size={16} className="text-[#1e3a8a]" />
+                {checkoutEnabled ? 'Cash on Delivery' : 'COD checkout is paused'}
               </span>
-              <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center">
-                <Check size={12} strokeWidth={3} />
+              <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-white text-[#1e3a8a] border border-blue-200">
+                {checkoutEnabled ? 'PAY ON DELIVERY' : 'NOT ACTIVE'}
               </span>
             </div>
-            <p className="text-[11px] text-emerald-800 leading-normal">
-              No payment will be collected and no order can be submitted while checkout is disabled.
+            <p className="text-[11px] text-gray-700 leading-normal">
+              {checkoutEnabled
+                ? 'Pay the delivery amount in cash when your parcel arrives. No online payment is collected.'
+                : 'No order will be created until the production database security checks are completed.'}
             </p>
           </div>
 
@@ -271,15 +299,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div className="pt-2">
             <button
               type="submit"
-              disabled={true}
+              disabled={!checkoutEnabled || !currentUser || cart.length === 0 || isSubmitting}
               className="w-full py-3.5 bg-gradient-to-r from-[#ea580c] to-[#f97316] hover:from-orange-600 hover:to-orange-700 text-white font-black text-sm rounded-xl shadow-lg transition tap-effect flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isSubmitting ? (
-                <span>Confirming Order...</span>
+                <span>Confirming COD Order...</span>
               ) : (
                 <>
                   <CheckCircle size={18} />
-                  <span>Checkout unavailable — no order can be placed</span>
+                  <span>{checkoutEnabled ? 'Place Cash on Delivery Order' : 'Checkout paused — no order can be placed'}</span>
                 </>
               )}
             </button>
