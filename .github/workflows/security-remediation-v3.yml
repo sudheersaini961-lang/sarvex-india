@@ -1,4 +1,4 @@
-name: SARVEX Security Remediation v3 (Isolated PostgreSQL)
+name: SARVEX Security and Performance Remediation (Isolated PostgreSQL)
 
 on:
   workflow_dispatch:
@@ -8,16 +8,18 @@ on:
     paths:
       - "supabase/migrations/20261120090000_sarvex_security_remediation_v3.sql"
       - "supabase/migrations/20261120100000_sarvex_first_admin_bootstrap.sql"
+      - "supabase/migrations/20261120110000_sarvex_performance_tuning_v1.sql"
       - "supabase/tests/first-admin-bootstrap-smoke.sql"
-      - "supabase/functions/bootstrap-first-admin/**"
       - "supabase/tests/security-remediation-v3-smoke.sql"
+      - "supabase/tests/performance-tuning-v1-smoke.sql"
+      - "supabase/functions/bootstrap-first-admin/**"
       - ".github/workflows/security-remediation-v3.yml"
 
 permissions:
   contents: read
 
 concurrency:
-  group: sarvex-security-remediation-v3-${{ github.ref }}
+  group: sarvex-security-performance-remediation-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -84,6 +86,12 @@ jobs:
 
       - name: Verify one-time first-admin bootstrap
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/first-admin-bootstrap-smoke.sql
+
+      - name: Apply performance tuning migration (test database only)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261120110000_sarvex_performance_tuning_v1.sql
+
+      - name: Verify performance tuning invariants
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/performance-tuning-v1-smoke.sql
 
   edge-function-typecheck:
     name: First-admin Edge Function type check
