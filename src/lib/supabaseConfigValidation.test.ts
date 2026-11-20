@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { validateSupabaseClientConfig } from './supabaseConfigValidation';
 
 function jwt(payload: object): string {
-  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const encode = (value: object) => btoa(JSON.stringify(value)).replace(/=/g, '').replace(/\\+/g, '-').replace(/\\//g, '_');
   return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(payload)}.signature`;
 }
 
