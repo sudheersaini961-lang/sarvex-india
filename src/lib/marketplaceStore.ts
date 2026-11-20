@@ -628,6 +628,40 @@ export function useMarketplace() {
     };
   };
 
+  const refreshCurrentUserRole = async (): Promise<boolean> => {
+    const supabase = getSupabase();
+    if (!supabase) return false;
+
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) return false;
+
+      const userId = authData.user.id;
+      const { data: profile } = await supabase
+        .from('customer_profiles')
+        .select('display_name, phone')
+        .eq('owner_id', userId)
+        .maybeSingle();
+
+      const realRole = await getVerifiedMarketplaceRole(supabase, userId);
+      await syncSellerShopsForUser(supabase, userId, realRole);
+      globalState.currentUser = {
+        id: userId,
+        email: authData.user.email || '',
+        fullName: profile?.display_name || authData.user.email?.split('@')[0] || 'SARVEX User',
+        phone: profile?.phone || '',
+        role: realRole,
+        createdAt: authData.user.created_at || new Date().toISOString()
+      };
+      globalState.activeRole = realRole;
+      notify();
+      return true;
+    } catch (error) {
+      console.warn('Could not refresh verified SARVEX role:', error);
+      return false;
+    }
+  };
+
   const logoutUser = async () => {
     const supabase = getSupabase();
     if (supabase) {
@@ -1240,6 +1274,7 @@ export function useMarketplace() {
     stats,
     setActiveRole,
     loginUserWithSupabase,
+    refreshCurrentUserRole,
     logoutUser,
     setSearchQuery,
     setSelectedCategory,
