@@ -42,8 +42,10 @@ jobs:
 
       - name: Build production web bundle
         env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          # These are public client values (never use service_role or sb_secret_ here).
+          # The publishable key is designed to be embedded in browser/mobile clients.
+          VITE_SUPABASE_URL: https://lgeoxxvmsssazorubsvr.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_CcfCLJrv-maxAohKITaCQA_nEx94zqG
         run: npm run build
 
       - name: Sync Capacitor Android project
