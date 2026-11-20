@@ -110,13 +110,12 @@ BEGIN
   END LOOP;
 
   -- A newly-created public function must not inherit EXECUTE for browser roles.
-  CREATE OR REPLACE FUNCTION public.sarvex_default_function_acl_probe()
-  RETURNS integer LANGUAGE sql AS 'SELECT 1';
+  EXECUTE 'CREATE OR REPLACE FUNCTION public.sarvex_default_function_acl_probe() RETURNS integer LANGUAGE sql AS ''SELECT 1''';
   IF has_function_privilege('anon','public.sarvex_default_function_acl_probe()','EXECUTE')
      OR has_function_privilege('authenticated','public.sarvex_default_function_acl_probe()','EXECUTE') THEN
     RAISE EXCEPTION 'FAIL: browser roles inherit EXECUTE on newly-created public functions';
   END IF;
-  DROP FUNCTION public.sarvex_default_function_acl_probe();
+  EXECUTE 'DROP FUNCTION public.sarvex_default_function_acl_probe()';
 
   FOREACH v_name IN ARRAY v_expected LOOP
     v_sig := to_regprocedure('public.' || v_name);
