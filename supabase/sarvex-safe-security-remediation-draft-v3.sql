@@ -52,6 +52,28 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
   REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;
 
+-- PostgreSQL grants EXECUTE to PUBLIC by default for new functions globally.
+-- Remove that global default as well as the schema-specific defaults above.
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+
+-- Remove dangerous table-level capabilities retained by older live grants.
+-- These are not needed for ordinary marketplace CRUD or for existing triggers.
+REVOKE TRUNCATE, TRIGGER, REFERENCES ON TABLE
+  public.cart_items,
+  public.categories,
+  public.customer_profiles,
+  public.order_idempotency_keys,
+  public.order_items,
+  public.orders,
+  public.products,
+  public.review_helpful_votes,
+  public.reviews,
+  public.sarvex_admin_allowlist,
+  public.seller_shops,
+  public.wishlist_items
+FROM PUBLIC, anon, authenticated;
+
 -- 2. Preserve the public seller directory safely.
 -- Live definition inspected: public.sellers exposes only:
 -- id, owner_id (as user_id), shop_name, owner_name, city, state, pincode,
