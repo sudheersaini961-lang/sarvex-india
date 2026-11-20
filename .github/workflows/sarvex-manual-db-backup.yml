@@ -1,0 +1,87 @@
+name: SARVEX Manual Encrypted Database Backup
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check required secrets
+        shell: bash
+        env:
+          SARVEX_DB_URL: ${{ secrets.SARVEX_DB_URL }}
+          BACKUP_ENCRYPTION_PASSWORD: ${{ secrets.SARVEX_BACKUP_ENCRYPTION_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$SARVEX_DB_URL" || { echo "::error::Missing SARVEX_DB_URL repository secret"; exit 1; }
+          test -n "$BACKUP_ENCRYPTION_PASSWORD" || { echo "::error::Missing SARVEX_BACKUP_ENCRYPTION_PASSWORD repository secret"; exit 1; }
+          case "$SARVEX_DB_URL" in
+            postgresql://*|postgres://*) ;;
+            *) echo "::error::SARVEX_DB_URL must be a PostgreSQL connection URI"; exit 1 ;;
+          esac
+          if [ "${#BACKUP_ENCRYPTION_PASSWORD}" -lt 24 ]; then
+            echo "::error::Backup encryption password must be at least 24 characters"; exit 1
+          fi
+
+      - name: Check pinned Supabase CLI v3
+        run: |
+          npx --yes supabase@3 --version
+
+      - name: Export schema, data, and custom roles
+        shell: bash
+        env:
+          SARVEX_DB_URL: ${{ secrets.SARVEX_DB_URL }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p backup
+          # db dump is a read-only export. Never add db push, migration, reset, or SQL execution commands.
+          npx --yes supabase@3 db dump --remote="$SARVEX_DB_URL" --file=backup/schema.sql
+          npx --yes supabase@3 db dump --remote="$SARVEX_DB_URL" --data-only --use-copy --file=backup/data.sql
+          npx --yes supabase@3 db dump --remote="$SARVEX_DB_URL" --role-only --file=backup/roles.sql
+          test -s backup/schema.sql
+          test -s backup/data.sql
+          test -s backup/roles.sql
+          cat > backup/README.txt <<'EOF'
+SARVEX logical database export
+Contains: user-managed schema, its data, and custom PostgreSQL roles.
+Does NOT contain Supabase-managed auth/storage schemas, Storage file objects,
+Edge Functions, Auth settings, API keys, or other project configuration.
+This export has not been restore-tested. Do not treat it as a verified
+disaster-recovery backup until a separate restore test is completed.
+EOF
+          tar -czf sarvex-db-backup.tar.gz backup
+
+      - name: Encrypt with integrity protection, verify decryption, and calculate checksum
+        shell: bash
+        env:
+          BACKUP_ENCRYPTION_PASSWORD: ${{ secrets.SARVEX_BACKUP_ENCRYPTION_PASSWORD }}
+        run: |
+          set -euo pipefail
+          trap 'rm -f sarvex-db-backup.tar.gz /tmp/sarvex-db-backup-verify.tar.gz; rm -rf backup' EXIT
+          # GnuPG symmetric encryption uses an integrity-protected packet (MDC).
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 \
+            --symmetric --cipher-algo AES256 \
+            --output sarvex-db-backup.tar.gz.enc sarvex-db-backup.tar.gz \
+            3<<<"$BACKUP_ENCRYPTION_PASSWORD"
+          # Verify decryption/integrity and that the recovered payload is a readable tar archive.
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 \
+            --decrypt --output /tmp/sarvex-db-backup-verify.tar.gz sarvex-db-backup.tar.gz.enc \
+            3<<<"$BACKUP_ENCRYPTION_PASSWORD"
+          tar -tzf /tmp/sarvex-db-backup-verify.tar.gz >/dev/null
+          sha256sum sarvex-db-backup.tar.gz.enc > sarvex-db-backup.tar.gz.enc.sha256
+
+      - name: Upload encrypted backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sarvex-encrypted-db-backup
+          path: |
+            sarvex-db-backup.tar.gz.enc
+            sarvex-db-backup.tar.gz.enc.sha256
+          retention-days: 3
+          if-no-files-found: error
