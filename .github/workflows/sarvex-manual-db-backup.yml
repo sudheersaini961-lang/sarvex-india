@@ -64,14 +64,15 @@ EOF
         run: |
           set -euo pipefail
           trap 'rm -f sarvex-db-backup.tar.gz /tmp/sarvex-db-backup-verify.tar.gz; rm -rf backup' EXIT
-          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt \
-            -in sarvex-db-backup.tar.gz \
-            -out sarvex-db-backup.tar.gz.enc \
-            -pass env:BACKUP_ENCRYPTION_PASSWORD
-          # Verify that the encrypted archive decrypts and contains a readable tar archive.
-          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in sarvex-db-backup.tar.gz.enc \
-            -out /tmp/sarvex-db-backup-verify.tar.gz \
-            -pass env:BACKUP_ENCRYPTION_PASSWORD
+          # GnuPG symmetric encryption uses an integrity-protected packet (MDC).
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 \\
+            --symmetric --cipher-algo AES256 \\
+            --output sarvex-db-backup.tar.gz.enc sarvex-db-backup.tar.gz \\
+            3<<<"$BACKUP_ENCRYPTION_PASSWORD"
+          # Verify decryption/integrity and that the recovered payload is a readable tar archive.
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 \\
+            --decrypt --output /tmp/sarvex-db-backup-verify.tar.gz sarvex-db-backup.tar.gz.enc \\
+            3<<<"$BACKUP_ENCRYPTION_PASSWORD"
           tar -tzf /tmp/sarvex-db-backup-verify.tar.gz >/dev/null
           sha256sum sarvex-db-backup.tar.gz.enc > sarvex-db-backup.tar.gz.enc.sha256
 
