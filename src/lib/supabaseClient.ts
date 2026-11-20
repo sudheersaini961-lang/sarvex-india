@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient, User as SupabaseUser } from '@supabase/supabase-js';
+import { validateSupabaseClientConfig } from './supabaseConfigValidation';
 
 // Helper to validate UUID RFC4122
 export function isUuid(value: string | undefined | null): boolean {
@@ -45,15 +46,12 @@ export function getStoredSupabaseConfig() {
   const url = (localUrl || envUrl || '').trim();
   const key = (localKey || envKey || '').trim();
 
-  const isConfigured = Boolean(
-    url &&
-    key &&
-    url.startsWith('https://') &&
-    url.includes('.supabase.co') &&
-    key.length > 20
-  );
-
-  return { url, key, isConfigured };
+  const validation = validateSupabaseClientConfig(url, key);
+  return {
+    url: validation.normalizedUrl || url,
+    key,
+    isConfigured: validation.valid
+  };
 }
 
 let supabaseInstance: SupabaseClient | null = null;
@@ -80,8 +78,13 @@ export function getSupabase(): SupabaseClient | null {
 }
 
 export function saveSupabaseConfig(url: string, key: string) {
+  const validation = validateSupabaseClientConfig(url, key);
+  if (!validation.valid || !validation.normalizedUrl) {
+    throw new Error(validation.message || 'Invalid Supabase client configuration.');
+  }
+
   if (typeof window !== 'undefined') {
-    localStorage.setItem('sarvex_supabase_url', url.trim());
+    localStorage.setItem('sarvex_supabase_url', validation.normalizedUrl);
     localStorage.setItem('sarvex_supabase_key', key.trim());
     supabaseInstance = null; // reset instance so next call uses new credentials
     window.dispatchEvent(new CustomEvent('sarvex:supabase_config_changed'));
@@ -101,27 +104,13 @@ export async function testSupabaseConnection(url?: string, key?: string): Promis
   const targetUrl = (url || getStoredSupabaseConfig().url).trim();
   const targetKey = (key || getStoredSupabaseConfig().key).trim();
 
-  if (!targetUrl || !targetKey) {
-    return { success: false, message: 'Please provide both Supabase Project URL and Anon Public Key.' };
-  }
-
-  // Prevent service_role key usage for security
-  if (targetKey.toLowerCase().includes('service_role')) {
-    return {
-      success: false,
-      message: 'Security Alert: Do NOT use the service_role secret key in a client browser! Use the safe "anon" public key from Supabase Project Settings → API.'
-    };
-  }
-
-  if (!targetUrl.startsWith('https://') || !targetUrl.includes('.supabase.co')) {
-    return {
-      success: false,
-      message: 'Invalid URL. Project URL must start with https:// and end with .supabase.co'
-    };
+  const validation = validateSupabaseClientConfig(targetUrl, targetKey);
+  if (!validation.valid || !validation.normalizedUrl) {
+    return { success: false, message: validation.message || 'Invalid Supabase client configuration.' };
   }
 
   try {
-    const testClient = createClient(targetUrl, targetKey);
+    const testClient = createClient(validation.normalizedUrl, targetKey);
     // Real query test against user's existing products table
     const { error } = await testClient.from('products').select('id').limit(1);
 
