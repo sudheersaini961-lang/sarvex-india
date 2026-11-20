@@ -11,7 +11,7 @@ This runbook describes the controlled deployment of the security migrations. It 
 - The following repository migrations are **not yet recorded as applied** in the live project:
   - `20261120090000_sarvex_security_remediation_v3`
   - `20261120100000_sarvex_first_admin_bootstrap`
-- `20261120110000_sarvex_performance_tuning_v1`
+  - `20261120110000_sarvex_performance_tuning_v1`
 - No Supabase development branches were returned by the project API during this inspection.
 - No restorable database/Auth/Storage backup has been verified.
 - Marketplace writes and checkout must remain disabled.
@@ -20,7 +20,7 @@ These facts must be rechecked immediately before deployment; do not assume they 
 
 ## Hard stop conditions
 
-Do not apply either migration to production until all of the following are true:
+Do not apply these migrations to production until all of the following are true:
 
 1. A current backup exists and its restore procedure has been verified. Include database plus any required Auth and Storage recovery plan.
 2. A rollback/forward-fix owner and maintenance window are identified.
@@ -51,7 +51,7 @@ Apply migrations using the Supabase migration workflow/CLI so migration history 
 7. Deploy `supabase/functions/bootstrap-first-admin` only after setting the server-side secrets:
    - `SARVEX_FIRST_ADMIN_EMAIL` (the exact verified initial administrator email);
    - the platform-provided `SUPABASE_URL`, publishable/anon key, and `SUPABASE_SERVICE_ROLE_KEY` server secrets.
-7. Never put `SUPABASE_SERVICE_ROLE_KEY` in the Android app, web bundle, repository, or client configuration.
+8. Never put `SUPABASE_SERVICE_ROLE_KEY` in the Android app, web bundle, repository, or client configuration.
 
 The first-admin function is a one-time bootstrap. Verify the allowlisted email and account identity before invoking it. Do not invoke it speculatively.
 
