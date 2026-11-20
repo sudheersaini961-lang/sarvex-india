@@ -137,6 +137,31 @@ BEGIN
     RAISE EXCEPTION 'FAIL: checkout RPC grants are incorrect';
   END IF;
 
+  -- RLS helper predicates intentionally remain callable by browser roles:
+  -- the current marketplace RLS policies invoke these functions directly.
+  IF NOT has_function_privilege('anon','public.is_sarvex_admin()','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.is_sarvex_admin()','EXECUTE')
+     OR NOT has_function_privilege('anon','public.is_seller_shop_owner(uuid)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.is_seller_shop_owner(uuid)','EXECUTE')
+     OR NOT has_function_privilege('anon','public.is_approved_seller_shop(uuid)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.is_approved_seller_shop(uuid)','EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: RLS helper function grants do not match the current marketplace policy requirements';
+  END IF;
+
+  -- Sensitive user/order predicates and state-changing RPCs are authenticated-only.
+  IF has_function_privilege('anon','public.claim_sarvex_admin_seat()','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.claim_sarvex_admin_seat()','EXECUTE')
+     OR has_function_privilege('anon','public.has_verified_purchase(uuid,uuid)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.has_verified_purchase(uuid,uuid)','EXECUTE')
+     OR has_function_privilege('anon','public.order_has_seller_item(uuid)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.order_has_seller_item(uuid)','EXECUTE')
+     OR has_function_privilege('anon','public.is_order_customer(uuid)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.is_order_customer(uuid)','EXECUTE')
+     OR has_function_privilege('anon','public.vote_review_helpful(uuid)','EXECUTE')
+     OR NOT has_function_privilege('authenticated','public.vote_review_helpful(uuid)','EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: authenticated-only RPC/helper grants are incorrect';
+  END IF;
+
   FOREACH v_name IN ARRAY ARRAY[
     'handle_new_sarvex_user()',
     'protect_customer_account_role()',
