@@ -11,10 +11,12 @@ on:
       - "tsconfig*.json"
       - "vite.config.*"
       - ".github/workflows/launch-readiness.yml"
+      - ".github/workflows/android-apk.yml"
   pull_request:
     branches:
       - main
     paths:
+      - ".github/workflows/android-apk.yml"
       - "src/**"
       - "package.json"
       - "package-lock.json"
