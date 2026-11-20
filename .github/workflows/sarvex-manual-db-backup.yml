@@ -57,7 +57,7 @@ disaster-recovery backup until a separate restore test is completed.
 EOF
           tar -czf sarvex-db-backup.tar.gz backup
 
-      - name: Encrypt, verify decryption, and calculate checksum
+      - name: Encrypt with integrity protection, verify decryption, and calculate checksum
         shell: bash
         env:
           BACKUP_ENCRYPTION_PASSWORD: ${{ secrets.SARVEX_BACKUP_ENCRYPTION_PASSWORD }}
