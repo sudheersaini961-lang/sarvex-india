@@ -1210,6 +1210,7 @@ export function useMarketplace() {
 
   return {
     ...state,
+    checkoutEnabled: MARKETPLACE_WRITES_ENABLED,
     filteredProducts,
     cartTotalAmount,
     cartTotalMrp,
