@@ -1,8 +1,8 @@
 -- SARVEX SAFE SECURITY REMEDIATION (REVISED DRAFT)
 -- Prepared from read-only live inspection on 2026-11-20.
 -- DO NOT RUN until a current restorable backup exists and app/API impact is reviewed.
--- This file has NOT been executed or tested against an isolated PostgreSQL instance.
--- Static review only; the two SECURITY DEFINER views remain intentional residual advisor findings.
+-- Isolated PostgreSQL 15/16/17 CI tests PASS (GitHub Actions run 44701340252, 2026-11-20).
+-- NOT executed against live Supabase. The two SECURITY DEFINER views remain intentional residual advisor findings.
 -- No marketplace rows, users, products, orders, or storage objects are modified.
 
 BEGIN;
