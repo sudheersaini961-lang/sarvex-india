@@ -60,7 +60,7 @@ BEGIN
   -- The ALL policy is sufficient for admin SELECT; duplicate SELECT policy is removed.
   SELECT count(*) INTO v_count
   FROM pg_policies
-  WHERE schemaname='public' AND tablename='sarvex_admin_allowlist' AND cmd='SELECT';
+  WHERE schemaname='public' AND tablename='sarvex_admin_allowlist' AND cmd IN ('ALL','SELECT');
   IF v_count <> 1 OR NOT EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname='public' AND tablename='sarvex_admin_allowlist'
