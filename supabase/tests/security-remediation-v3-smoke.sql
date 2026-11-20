@@ -6,6 +6,7 @@ DECLARE
   v_viewdef text;
   v_sig regprocedure;
   v_name text;
+  v_table text;
   v_expected text[] := ARRAY[
     'is_sarvex_admin()',
     'is_seller_shop_owner(uuid)',
@@ -91,6 +92,31 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'FAIL: broad seller SELECT policy on orders must not be added';
   END IF;
+
+  -- Authenticated and anonymous clients must not retain DDL-like table privileges.
+  FOREACH v_table IN ARRAY ARRAY[
+    'cart_items', 'categories', 'customer_profiles', 'order_idempotency_keys',
+    'order_items', 'orders', 'products', 'review_helpful_votes', 'reviews',
+    'sarvex_admin_allowlist', 'seller_shops', 'wishlist_items'
+  ] LOOP
+    IF has_table_privilege('anon', 'public.' || v_table, 'TRUNCATE')
+       OR has_table_privilege('anon', 'public.' || v_table, 'TRIGGER')
+       OR has_table_privilege('anon', 'public.' || v_table, 'REFERENCES')
+       OR has_table_privilege('authenticated', 'public.' || v_table, 'TRUNCATE')
+       OR has_table_privilege('authenticated', 'public.' || v_table, 'TRIGGER')
+       OR has_table_privilege('authenticated', 'public.' || v_table, 'REFERENCES') THEN
+      RAISE EXCEPTION 'FAIL: dangerous table privilege remains on public.%', v_table;
+    END IF;
+  END LOOP;
+
+  -- A newly-created public function must not inherit EXECUTE for browser roles.
+  CREATE OR REPLACE FUNCTION public.sarvex_default_function_acl_probe()
+  RETURNS integer LANGUAGE sql AS 'SELECT 1';
+  IF has_function_privilege('anon','public.sarvex_default_function_acl_probe()','EXECUTE')
+     OR has_function_privilege('authenticated','public.sarvex_default_function_acl_probe()','EXECUTE') THEN
+    RAISE EXCEPTION 'FAIL: browser roles inherit EXECUTE on newly-created public functions';
+  END IF;
+  DROP FUNCTION public.sarvex_default_function_acl_probe();
 
   FOREACH v_name IN ARRAY v_expected LOOP
     v_sig := to_regprocedure('public.' || v_name);
