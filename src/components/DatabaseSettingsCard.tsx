@@ -82,11 +82,18 @@ export const DatabaseSettingsCard: React.FC<DatabaseSettingsCardProps> = ({
       return;
     }
 
-    saveSupabaseConfig(url.trim(), anonKey.trim());
-    setResultStatus({
-      success: true,
-      message: 'Configuration saved! Click "Test Connection" to verify real connectivity.'
-    });
+    try {
+      saveSupabaseConfig(url.trim(), anonKey.trim());
+      setResultStatus({
+        success: true,
+        message: 'Public Supabase configuration saved. Click "Test Connection" to verify real connectivity.'
+      });
+    } catch (error: any) {
+      setResultStatus({
+        success: false,
+        message: error?.message || 'Invalid Supabase configuration.'
+      });
+    }
   };
 
   const handleDisconnect = () => {
@@ -189,7 +196,7 @@ Connect a Supabase project and run the approved migration before using marketpla
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="text-[11px] font-bold text-gray-700">
-              Supabase Anon Public API Key *
+              Supabase Anon / Publishable Public API Key *
             </label>
             <button
               type="button"
@@ -212,7 +219,7 @@ Connect a Supabase project and run the approved migration before using marketpla
           {/* Security Guarantee Notice */}
           <div className="flex items-center gap-1 mt-1 text-[10px] text-amber-700 font-medium">
             <AlertTriangle size={11} className="shrink-0" />
-            <span>Use the safe "anon" public key only. Never provide the secret "service_role" key.</span>
+            <span>Use only the anon JWT or sb_publishable_ public key. Never use service_role or sb_secret_ keys.</span>
           </div>
         </div>
       </div>
