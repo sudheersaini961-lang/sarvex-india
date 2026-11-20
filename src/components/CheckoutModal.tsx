@@ -7,8 +7,7 @@ import {
   MapPin,
   Phone,
   User,
-  Building,
-  Check
+  Building
 } from 'lucide-react';
 import { useMarketplace } from '../lib/marketplaceStore';
 import { Order } from '../types/marketplace';
