@@ -42,7 +42,7 @@ jobs:
           mkdir -p backup
           # db dump is a read-only export. Never add db push, migration, reset, or SQL execution commands.
           npx --yes supabase@3 db dump --remote="$SARVEX_DB_URL" --file=backup/schema.sql
-          npx --yes supabase@3 db dump --remote="$SARVEX_DB_URL" --data-only --file=backup/data.sql
+          npx --yes supabase@3 db dump --remote="$SARVEX_DB_URL" --data-only --use-copy --file=backup/data.sql
           npx --yes supabase@3 db dump --remote="$SARVEX_DB_URL" --role-only --file=backup/roles.sql
           test -s backup/schema.sql
           test -s backup/data.sql
