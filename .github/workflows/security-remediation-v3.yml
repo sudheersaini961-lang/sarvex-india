@@ -7,6 +7,9 @@ on:
       - main
     paths:
       - "supabase/migrations/20261120090000_sarvex_security_remediation_v3.sql"
+      - "supabase/migrations/20261120100000_sarvex_first_admin_bootstrap.sql"
+      - "supabase/tests/first-admin-bootstrap-smoke.sql"
+      - "supabase/functions/bootstrap-first-admin/**"
       - "supabase/tests/security-remediation-v3-smoke.sql"
       - ".github/workflows/security-remediation-v3.yml"
 
@@ -75,3 +78,28 @@ jobs:
 
       - name: Verify registered security remediation migration
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/security-remediation-v3-smoke.sql
+
+      - name: Apply one-time first-admin migration (test database only)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261120100000_sarvex_first_admin_bootstrap.sql
+
+      - name: Verify one-time first-admin bootstrap
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/first-admin-bootstrap-smoke.sql
+
+  edge-function-typecheck:
+    name: First-admin Edge Function type check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Type-check first-admin Edge Function
+        run: deno check --no-lock supabase/functions/bootstrap-first-admin/index.ts
