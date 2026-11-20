@@ -28,6 +28,7 @@
   },
   "exclude": [
     "dist",
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "supabase/functions"
   ]
 }
