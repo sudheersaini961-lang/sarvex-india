@@ -51,7 +51,7 @@ export function validateSupabaseClientConfig(url: string, key: string): Supabase
   // would incorrectly accept attacker.supabase.co.example.com.
   if (
     parsed.protocol !== 'https:' ||
-    !/^[a-z0-9-]+\.supabase\.co$/i.test(parsed.hostname) ||
+    !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.supabase\.co$/i.test(parsed.hostname) ||
     parsed.username ||
     parsed.password ||
     parsed.port ||
