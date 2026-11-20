@@ -69,15 +69,7 @@ export const DatabaseSettingsCard: React.FC<DatabaseSettingsCardProps> = ({
     if (!url.trim() || !anonKey.trim()) {
       setResultStatus({
         success: false,
-        message: 'Please provide both Supabase Project URL and Anon Public Key.'
-      });
-      return;
-    }
-
-    if (anonKey.toLowerCase().includes('service_role')) {
-      setResultStatus({
-        success: false,
-        message: 'Security Alert: Do NOT use the service_role secret key in the browser! Use the "anon" public key.'
+        message: 'Please provide both Supabase Project URL and a public anon/publishable API key.'
       });
       return;
     }
