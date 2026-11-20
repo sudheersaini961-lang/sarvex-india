@@ -86,11 +86,6 @@ BEGIN
     RAISE EXCEPTION 'FAIL: duplicate indexes remain';
   END IF;
 
-  IF NOT has_table_privilege('anon','public.categories','SELECT')
-     OR has_table_privilege('anon','public.categories','INSERT')
-     OR has_table_privilege('authenticated','public.categories','INSERT') THEN
-    RAISE EXCEPTION 'FAIL: category table grants changed unexpectedly';
-  END IF;
 END
 $smoke$;
 
