@@ -225,6 +225,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   onChange={(e) => setState(e.target.value)}
                   className="w-full text-xs px-2.5 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-[#1e3a8a] focus:outline-none"
                 >
+                  <option value="" disabled>Select your state</option>
                   {INDIAN_STATES.map((s) => (
                     <option key={s} value={s}>
                       {s}
