@@ -11,6 +11,7 @@ on:
       - "tsconfig*.json"
       - "vite.config.*"
       - ".github/workflows/launch-readiness.yml"
+      - ".github/workflows/android-apk.yml"
   pull_request:
     branches:
       - main
