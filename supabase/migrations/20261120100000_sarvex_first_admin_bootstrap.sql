@@ -76,9 +76,8 @@ BEGIN
   INSERT INTO public.sarvex_admin_allowlist (id, user_id, email, created_at)
   VALUES (gen_random_uuid(), p_user_id, v_email, now());
 
-  UPDATE public.customer_profiles
-  SET account_role = 'admin'
-  WHERE owner_id = p_user_id;
+  -- Do not mutate customer_profiles.account_role here. Authorization is derived
+  -- exclusively from the bound admin allowlist, not from a client-editable profile role.
 
   RETURN jsonb_build_object(
     'success', true,
