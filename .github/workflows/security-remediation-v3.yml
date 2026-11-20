@@ -1,0 +1,77 @@
+name: SARVEX Security Remediation Draft v3 (Isolated PostgreSQL)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "supabase/sarvex-safe-security-remediation-draft-v3.sql"
+      - "supabase/tests/security-remediation-v3-smoke.sql"
+      - ".github/workflows/security-remediation-v3.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sarvex-security-remediation-v3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-postgres:
+    name: PostgreSQL ${{ matrix.pg }} isolated remediation test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: ["15", "16", "17"]
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Bootstrap isolated Supabase-compatible interfaces
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap-supabase.sql
+
+      - name: Apply SARVEX base migration in disposable database
+        run: psql -v ON_ERROR_STOP=1 -f supabase-production-migration.sql
+
+      - name: Verify base migration
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/baseline-security-smoke.sql
+
+      - name: Apply existing additive security follow-up in disposable database
+        run: psql -v ON_ERROR_STOP=1 -f supabase-production-security-followup.sql
+
+      - name: Verify existing follow-up
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/security-followup-smoke.sql
+
+      - name: Apply reviewed remediation draft v3 (test database only)
+        run: psql -v ON_ERROR_STOP=1 -f supabase/sarvex-safe-security-remediation-draft-v3.sql
+
+      - name: Verify reviewed remediation draft v3
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/security-remediation-v3-smoke.sql
