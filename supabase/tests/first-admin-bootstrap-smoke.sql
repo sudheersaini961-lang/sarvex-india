@@ -11,8 +11,8 @@ BEGIN
     (v_second, 'other@example.invalid', now())
   ON CONFLICT (id) DO NOTHING;
 
-  SET LOCAL request.jwt.claim.role = 'service_role';
-  SET LOCAL request.jwt.claims = '{"role":"service_role"}';
+  PERFORM set_config('request.jwt.claim.role', 'service_role', true);
+  PERFORM set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
   v_result := public.bootstrap_first_admin_for_user(v_first);
   IF COALESCE((v_result->>'success')::boolean, false) IS NOT TRUE
