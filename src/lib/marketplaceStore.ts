@@ -142,6 +142,21 @@ function loadInitialState(): MarketplaceState {
 let globalState = loadInitialState();
 const listeners = new Set<() => void>();
 
+// Keep a retry key in memory for identical COD checkout requests. The database
+// stores the request fingerprint and returns the original order on safe retries.
+const checkoutIdempotencyKeys = new Map<string, string>();
+
+async function fingerprintCheckoutRequest(value: unknown): Promise<string> {
+  if (typeof crypto === 'undefined' || !crypto.subtle) {
+    throw new Error('Secure checkout requires a modern browser with Web Crypto support.');
+  }
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 function notify() {
   // Never persist profiles, seller KYC/payout details, cart, or order data in browser storage.
   listeners.forEach((listener) => listener());
@@ -738,9 +753,11 @@ export function useMarketplace() {
     }
   };
 
-  // Checkout is intentionally fail-closed until the production schema,
-  // payment collection, delivery, returns/refunds and reconciliation are verified.
-  const placeOrder = async (_orderData: {
+  // COD checkout uses the database RPC as the only authority for prices,
+  // stock, seller approval, order creation and cart clearing. The global write
+  // guard remains OFF until the production security migration is reviewed,
+  // deployed and verified; this implementation is deliberately fail-closed.
+  const placeOrder = async (orderData: {
     customerName: string;
     customerPhone: string;
     customerEmail?: string;
@@ -749,7 +766,168 @@ export function useMarketplace() {
     state: string;
     pincode: string;
   }): Promise<Order> => {
-    throw new Error('SARVEX checkout is temporarily unavailable. No order has been placed.');
+    assertMarketplaceWritesEnabled();
+
+    const supabase = getSupabase();
+    const customerId = globalState.currentUser?.id;
+    if (!supabase || !customerId || !isUuid(customerId)) {
+      throw new Error('Please sign in to your SARVEX account before placing a COD order.');
+    }
+
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData.session?.user || sessionData.session.user.id !== customerId) {
+      throw new Error('Your SARVEX session could not be verified. Please sign in again.');
+    }
+
+    const customerName = orderData.customerName.trim();
+    const customerPhone = orderData.customerPhone.trim();
+    const customerEmail = orderData.customerEmail?.trim() || '';
+    const shippingAddress = orderData.shippingAddress.trim();
+    const city = orderData.city.trim();
+    const state = orderData.state.trim();
+    const pincode = orderData.pincode.trim();
+
+    if (!customerName || customerName.length > 100) {
+      throw new Error('Please enter your name (maximum 100 characters).');
+    }
+    if (!/^[0-9]{10}$/.test(customerPhone)) {
+      throw new Error('Please enter a valid 10-digit Indian mobile number.');
+    }
+    if (shippingAddress.length < 5 || shippingAddress.length > 300) {
+      throw new Error('Delivery address must be between 5 and 300 characters.');
+    }
+    if (!city || city.length > 100 || !state || state.length > 100) {
+      throw new Error('Please enter a valid city and state.');
+    }
+    if (!/^[1-9][0-9]{5}$/.test(pincode)) {
+      throw new Error('Please enter a valid 6-digit Indian PIN code.');
+    }
+    if (customerEmail && (customerEmail.length > 150 ||
+      !/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(customerEmail))) {
+      throw new Error('Please enter a valid email address.');
+    }
+
+    const cartSnapshot = globalState.cart.map((item) => ({
+      product: item.product,
+      quantity: item.quantity
+    }));
+    if (cartSnapshot.length < 1 || cartSnapshot.length > 50) {
+      throw new Error('Your cart must contain between 1 and 50 products.');
+    }
+    for (const item of cartSnapshot) {
+      if (!isUuid(item.product.id) || !Number.isInteger(item.quantity) ||
+        item.quantity < 1 || item.quantity > 50) {
+        throw new Error('Your cart contains an invalid product or quantity. Please refresh your cart.');
+      }
+    }
+
+    const rpcItems = cartSnapshot.map((item) => ({
+      product_id: item.product.id,
+      quantity: item.quantity
+    }));
+    const requestFingerprint = await fingerprintCheckoutRequest({
+      customerId,
+      customerName,
+      customerPhone,
+      customerEmail,
+      shippingAddress,
+      city,
+      state,
+      pincode,
+      items: rpcItems
+    });
+    let idempotencyKey = checkoutIdempotencyKeys.get(requestFingerprint);
+    if (!idempotencyKey) {
+      idempotencyKey = generateUuid();
+      checkoutIdempotencyKeys.set(requestFingerprint, idempotencyKey);
+    }
+
+    const { data, error } = await supabase.rpc('place_sarvex_order', {
+      p_customer_name: customerName,
+      p_customer_phone: customerPhone,
+      p_customer_email: customerEmail || null,
+      p_shipping_address: shippingAddress,
+      p_city: city,
+      p_state: state,
+      p_pincode: pincode,
+      p_items: rpcItems,
+      p_idempotency_key: idempotencyKey
+    });
+
+    if (error) {
+      // Retain the key: a network failure can happen after the database commits.
+      // An identical retry will therefore retrieve the original order, not duplicate it.
+      throw new Error(`COD order could not be confirmed: ${error.message}`);
+    }
+
+    const result = data as {
+      success?: boolean;
+      order_id?: string;
+      order_code?: string;
+      total_amount?: number | string;
+      status?: string;
+      error?: string;
+    } | null;
+
+    if (!result?.success || !isUuid(result.order_id) ||
+      typeof result.order_code !== 'string' || !result.order_code.trim()) {
+      throw new Error(result?.error || 'SARVEX did not return a verified order confirmation. Please check My Orders before retrying.');
+    }
+
+    const totalAmount = Number(result.total_amount);
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0 || result.status !== 'placed') {
+      throw new Error('SARVEX returned an invalid order confirmation. Please check My Orders before retrying.');
+    }
+
+    // The RPC has committed and cleared the server cart. Do not retry it with a
+    // new key if loading display details fails; the order itself is already real.
+    checkoutIdempotencyKeys.delete(requestFingerprint);
+    const { data: savedItems, error: itemsError } = await supabase
+      .from('order_items')
+      .select('id, product_id, seller_shop_id, product_name, price_inr, quantity, image_url, item_status')
+      .eq('order_id', result.order_id);
+
+    const savedOrderItems = !itemsError && savedItems ? savedItems.map((item: any) => ({
+      id: item.id,
+      productId: item.product_id || '',
+      sellerId: item.seller_shop_id || '',
+      title: item.product_name || 'Order item',
+      price: Number(item.price_inr || 0),
+      quantity: Number(item.quantity || 0),
+      imageUrl: item.image_url || ''
+    })) : [];
+
+    const order: Order = {
+      id: result.order_code,
+      databaseId: result.order_id,
+      customerId,
+      customerName,
+      customerPhone,
+      customerEmail: customerEmail || undefined,
+      shippingAddress,
+      city,
+      state,
+      pincode,
+      items: savedOrderItems,
+      totalAmount,
+      paymentMethod: 'cod',
+      status: 'placed',
+      statusHistory: [{
+        status: 'placed',
+        timestamp: new Date().toISOString(),
+        note: itemsError
+          ? 'COD order saved by SARVEX. Refresh order history to load item details.'
+          : 'COD order confirmed by SARVEX database.'
+      }],
+      createdAt: new Date().toISOString()
+    };
+
+    globalState.orders = [order, ...globalState.orders.filter((existing) =>
+      existing.databaseId !== order.databaseId
+    )];
+    globalState.cart = [];
+    notify();
+    return order;
   };
 
   const updateOrderStatus = async (orderId: string, nextStatus: OrderStatus, note?: string) => {
@@ -1032,6 +1210,7 @@ export function useMarketplace() {
 
   return {
     ...state,
+    checkoutEnabled: MARKETPLACE_WRITES_ENABLED,
     filteredProducts,
     cartTotalAmount,
     cartTotalMrp,
