@@ -48,6 +48,48 @@ async function getVerifiedMarketplaceRole(
   return 'customer';
 }
 
+async function syncSellerShopsForUser(
+  supabase: NonNullable<ReturnType<typeof getSupabase>>,
+  userId: string,
+  role: UserRole
+): Promise<void> {
+  const columns = 'id, owner_id, shop_name, owner_name, phone, email, city, state, pincode, pickup_address, approval_status, commission_rate, rating, created_at';
+  let query = supabase.from('seller_shops').select(columns);
+
+  // Only a verified administrator can load the approval queue. Other users
+  // may read their own application, including while it is pending.
+  if (role !== 'admin') query = query.eq('owner_id', userId);
+
+  const { data, error } = await query.order('created_at', { ascending: false });
+  if (error) throw error;
+
+  const mapped: Seller[] = (data || []).map((shop: any) => ({
+    id: shop.id,
+    userId: shop.owner_id,
+    storeName: shop.shop_name || 'Store',
+    ownerName: shop.owner_name || '',
+    phone: shop.phone || '',
+    email: shop.email || '',
+    city: shop.city || '',
+    state: shop.state || '',
+    pincode: shop.pincode || '',
+    pickupAddress: shop.pickup_address || '',
+    status: (shop.approval_status || 'pending') as any,
+    commissionRate: Number(shop.commission_rate || 0),
+    rating: Number(shop.rating ?? 0),
+    createdAt: shop.created_at || new Date().toISOString()
+  }));
+
+  if (role === 'admin') {
+    globalState.sellers = mapped;
+  } else {
+    globalState.sellers = [
+      ...globalState.sellers.filter((seller) => seller.userId !== userId),
+      ...mapped
+    ];
+  }
+}
+
 // Standard Categories
 export const INITIAL_CATEGORIES: Category[] = [
   {
@@ -282,6 +324,11 @@ export function useMarketplace() {
 
           // Resolve admin/seller UI access from server-side checks, never profile metadata.
           const assignedRole = await getVerifiedMarketplaceRole(supabase, authUser.id);
+          try {
+            await syncSellerShopsForUser(supabase, authUser.id, assignedRole);
+          } catch (shopSyncError) {
+            console.warn('Seller application sync failed:', shopSyncError);
+          }
           globalState.currentUser = {
             id: authUser.id,
             email: authUser.email || '',
@@ -292,37 +339,9 @@ export function useMarketplace() {
           };
           globalState.activeRole = assignedRole;
 
-          // Fetch the signed-in user's own shop details (including pending applications).
-          // RLS limits this query to the owner/admin; never request payout credentials here.
-          const { data: ownShop, error: ownShopError } = await supabase
-            .from('seller_shops')
-            .select('id, owner_id, shop_name, owner_name, phone, email, city, state, pincode, pickup_address, approval_status, commission_rate, rating, created_at')
-            .eq('owner_id', authUser.id)
-            .maybeSingle();
-          if (ownShopError) throw ownShopError;
-          if (ownShop) {
-            const ownSeller = {
-              id: ownShop.id,
-              userId: ownShop.owner_id,
-              storeName: ownShop.shop_name || 'Store',
-              ownerName: ownShop.owner_name || '',
-              phone: ownShop.phone || '',
-              email: ownShop.email || '',
-              city: ownShop.city || '',
-              state: ownShop.state || '',
-              pincode: ownShop.pincode || '',
-              pickupAddress: ownShop.pickup_address || '',
-              status: (ownShop.approval_status || 'pending') as any,
-              commissionRate: Number(ownShop.commission_rate || 0),
-              rating: Number(ownShop.rating ?? 0),
-              createdAt: ownShop.created_at || new Date().toISOString()
-            };
-            globalState.sellers = [
-              ...globalState.sellers.filter((seller) => seller.id !== ownSeller.id),
-              ownSeller
-            ];
-            shopNameMap[ownSeller.id] = ownSeller.storeName;
-          }
+          // Admins need the full seller approval queue; customers/sellers only
+          // receive their own private application row. KYC and payout fields are never selected.
+          await syncSellerShopsForUser(supabase, authUser.id, assignedRole);
 
           // Fetch Cart from cart_items table
           const { data: dbCart } = await supabase
@@ -536,6 +555,7 @@ export function useMarketplace() {
             }
 
             const realRole = await getVerifiedMarketplaceRole(supabase, userId);
+            await syncSellerShopsForUser(supabase, userId, realRole);
             globalState.currentUser = {
               id: userId,
               email: signUpData.user.email || email.trim(),
@@ -581,6 +601,7 @@ export function useMarketplace() {
 
             // Resolve admin/seller UI access from server-side checks, never profile metadata.
             const realRole = await getVerifiedMarketplaceRole(supabase, userId);
+            await syncSellerShopsForUser(supabase, userId, realRole);
             globalState.currentUser = {
               id: userId,
               email: email.trim(),
