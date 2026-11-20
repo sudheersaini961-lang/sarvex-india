@@ -11,6 +11,7 @@ This runbook describes the controlled deployment of the security migrations. It 
 - The following repository migrations are **not yet recorded as applied** in the live project:
   - `20261120090000_sarvex_security_remediation_v3`
   - `20261120100000_sarvex_first_admin_bootstrap`
+- `20261120110000_sarvex_performance_tuning_v1`
 - No Supabase development branches were returned by the project API during this inspection.
 - No restorable database/Auth/Storage backup has been verified.
 - Marketplace writes and checkout must remain disabled.
@@ -46,7 +47,8 @@ Apply migrations using the Supabase migration workflow/CLI so migration history 
    - new public functions do not inherit browser-role EXECUTE grants.
 4. Apply `20261120100000_sarvex_first_admin_bootstrap` only after step 3 passes.
 5. Verify its migration history entry and the service-role-only ACL on `bootstrap_first_admin_for_user(uuid)`.
-6. Deploy `supabase/functions/bootstrap-first-admin` only after setting the server-side secrets:
+6. Apply `20261120110000_sarvex_performance_tuning_v1` after the security and first-admin migrations pass their checks. Verify the RLS policy rewrites, three foreign-key indexes, and removal of only the three exact duplicate indexes in the performance smoke test.
+7. Deploy `supabase/functions/bootstrap-first-admin` only after setting the server-side secrets:
    - `SARVEX_FIRST_ADMIN_EMAIL` (the exact verified initial administrator email);
    - the platform-provided `SUPABASE_URL`, publishable/anon key, and `SUPABASE_SERVICE_ROLE_KEY` server secrets.
 7. Never put `SUPABASE_SERVICE_ROLE_KEY` in the Android app, web bundle, repository, or client configuration.
@@ -55,7 +57,7 @@ The first-admin function is a one-time bootstrap. Verify the allowlisted email a
 
 ## Post-migration verification
 
-Run Supabase Security Advisor again and compare findings with the pre-deployment baseline.
+Run Supabase Security Advisor and Performance Advisor again and compare findings with the pre-deployment baseline. The performance migration specifically targets the 18 `auth_rls_initplan` warnings, three uncovered foreign-key indexes, and duplicate index pairs observed on 2026-11-20. Unused-index notices may remain or appear for newly-added indexes until real marketplace traffic exists; do not remove indexes solely because an empty/low-traffic database has not used them.
 
 Expected residual findings may include the two intentionally limited SECURITY DEFINER views:
 - `public.sellers`
